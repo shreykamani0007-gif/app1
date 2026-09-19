@@ -22,6 +22,12 @@ import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import EventSwitcher from '../components/ui/EventSwitcher';
 import Modal from '../components/ui/Modal';
+import {
+  getRisksByEvent,
+  createRisk,
+  updateRisk,
+  deleteRisk,
+} from '../services/api';
 
 // Realistic demo risk registries for at least 3 distinct events
 const defaultRisksByEvent = {
@@ -175,22 +181,8 @@ const defaultOwnerOptions = [
 export default function Risks() {
   const { selectedEvent, selectedEventId } = useEventContext();
 
-  // Persistent risk store keyed by eventId
-  const [risksByEvent, setRisksByEvent] = useState(() => {
-    try {
-      const cached = localStorage.getItem('clubops_risks_by_event');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        return { ...defaultRisksByEvent, ...parsed };
-      }
-    } catch (err) {
-      console.warn('Failed to parse risks cache:', err);
-    }
-    return defaultRisksByEvent;
-  });
-
-  // Current active event's risks
-  const currentRisks = risksByEvent[selectedEventId] || [];
+  const [currentRisks, setCurrentRisks] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -231,15 +223,26 @@ export default function Risks() {
     }
   }, [toastMessage]);
 
-  // Persist helper
-  const persistRisks = (newData) => {
-    setRisksByEvent(newData);
+  const fetchRisks = async () => {
+    if (!selectedEventId) return;
     try {
-      localStorage.setItem('clubops_risks_by_event', JSON.stringify(newData));
+      setLoading(true);
+      const res = await getRisksByEvent(selectedEventId);
+      if (res && res.success && Array.isArray(res.data)) {
+        setCurrentRisks(res.data);
+      } else {
+        setCurrentRisks([]);
+      }
     } catch (err) {
-      console.warn('Failed to persist risks:', err);
+      console.warn('Failed to fetch risks from API:', err.message);
+    } finally {
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchRisks();
+  }, [selectedEventId]);
 
   // Open Modal for Create or Edit
   const openModal = (risk = null) => {
@@ -275,8 +278,8 @@ export default function Risks() {
   };
 
   // Handle Submit (Create or Edit)
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e) => {
+    if (e) e.preventDefault();
 
     // Required Field Validation
     const resolvedOwner =
@@ -309,69 +312,71 @@ export default function Risks() {
 
     setValidationError('');
 
-    if (editingRisk) {
-      // Edit existing risk for currently selected event
-      const updatedList = currentRisks.map((r) =>
-        r.id === editingRisk.id
-          ? {
-              ...r,
-              title: formData.title.trim(),
-              description: formData.description.trim(),
-              category: formData.category,
-              severity: formData.severity,
-              status: formData.status,
-              owner: resolvedOwner,
-              mitigation: formData.mitigation.trim(),
-              probability: formData.probability,
-              impact: formData.impact,
-              dueDate: formData.dueDate,
-              notes: formData.notes.trim(),
-            }
-          : r
-      );
+    try {
+      if (editingRisk) {
+        const id = editingRisk._id || editingRisk.id;
+        const res = await updateRisk(id, {
+          title: formData.title.trim(),
+          description: formData.description.trim(),
+          category: formData.category,
+          severity: formData.severity,
+          status: formData.status,
+          owner: resolvedOwner,
+          mitigation: formData.mitigation.trim(),
+          probability: formData.probability,
+          impact: formData.impact,
+          dueDate: formData.dueDate,
+          notes: formData.notes.trim(),
+        });
 
-      persistRisks({
-        ...risksByEvent,
-        [selectedEventId]: updatedList,
-      });
+        if (res && res.success && res.data) {
+          setCurrentRisks((prev) =>
+            prev.map((r) => ((r._id || r.id) === id ? res.data : r))
+          );
+        } else {
+          await fetchRisks();
+        }
 
-      setToastMessage('Risk updated successfully.');
-    } else {
-      // Create new risk for currently selected event ONLY
-      const newRisk = {
-        id: `risk_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        category: formData.category,
-        severity: formData.severity,
-        status: formData.status,
-        owner: resolvedOwner,
-        mitigation: formData.mitigation.trim(),
-        probability: formData.probability,
-        impact: formData.impact,
-        dueDate: formData.dueDate,
-        notes: formData.notes.trim(),
-      };
+        setToastMessage('Risk updated successfully.');
+      } else {
+        const res = await createRisk(selectedEventId, {
+          title: formData.title.trim(),
+          description: formData.description.trim(),
+          category: formData.category,
+          severity: formData.severity,
+          status: formData.status,
+          owner: resolvedOwner,
+          mitigation: formData.mitigation.trim(),
+          probability: formData.probability,
+          impact: formData.impact,
+          dueDate: formData.dueDate,
+          notes: formData.notes.trim(),
+        });
 
-      persistRisks({
-        ...risksByEvent,
-        [selectedEventId]: [newRisk, ...currentRisks],
-      });
+        if (res && res.success && res.data) {
+          setCurrentRisks((prev) => [res.data, ...prev]);
+        } else {
+          await fetchRisks();
+        }
 
-      setToastMessage('Risk logged successfully.');
+        setToastMessage('Risk logged successfully.');
+      }
+    } catch (err) {
+      console.error('Error saving risk:', err);
     }
 
     closeModal();
   };
 
   // Handle Delete (Only from current event)
-  const handleDeleteRisk = (id) => {
-    const updatedList = currentRisks.filter((r) => r.id !== id);
-    persistRisks({
-      ...risksByEvent,
-      [selectedEventId]: updatedList,
-    });
-    setToastMessage('Risk deleted.');
+  const handleDeleteRisk = async (id) => {
+    try {
+      await deleteRisk(id);
+      setCurrentRisks((prev) => prev.filter((r) => (r._id || r.id) !== id));
+      setToastMessage('Risk deleted.');
+    } catch (err) {
+      console.error('Error deleting risk:', err);
+    }
   };
 
   // Filtered risks
@@ -539,7 +544,7 @@ export default function Risks() {
                 : 'text-emerald-600';
 
             return (
-              <Card key={r.id} className="p-5 hover:shadow-md transition-shadow group">
+              <Card key={r._id || r.id} className="p-5 hover:shadow-md transition-shadow group">
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 mb-2.5">
                   <div className="flex items-start gap-3 min-w-0">
                     <AlertTriangle className={`w-5 h-5 shrink-0 mt-0.5 ${severityColor}`} />
@@ -620,7 +625,7 @@ export default function Risks() {
 
                     <button
                       type="button"
-                      onClick={() => handleDeleteRisk(r.id)}
+                      onClick={() => handleDeleteRisk(r._id || r.id)}
                       title="Delete Risk"
                       className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors opacity-80 group-hover:opacity-100"
                     >

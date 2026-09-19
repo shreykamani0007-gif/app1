@@ -17,6 +17,7 @@ router.route('/')
 router.route('/:meetingId')
   .get(getMeeting)
   .put(updateMeeting)
+  .patch(updateMeeting)
   .delete(deleteMeeting);
 
 export default router;

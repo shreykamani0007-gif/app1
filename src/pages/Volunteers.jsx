@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, UserPlus, Calendar, Clock, Search, Trash2, Pencil, Filter } from 'lucide-react';
 import { useEventContext } from '../context/EventContext';
 import PageHeader from '../components/ui/PageHeader';
@@ -7,176 +7,12 @@ import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import EventSwitcher from '../components/ui/EventSwitcher';
 import Modal from '../components/ui/Modal';
-
-// Realistic demo volunteer rosters for at least 3 distinct events
-const defaultVolunteersByEvent = {
-  evt_innovatex_2026: [
-    {
-      id: 'vol_inno_1',
-      name: 'Maya Patel',
-      role: 'Lead Usher',
-      team: 'Hospitality',
-      shift: 'Morning (08:00 - 13:00)',
-      status: 'confirmed',
-    },
-    {
-      id: 'vol_inno_2',
-      name: 'Kavita Rao',
-      role: 'Stage Manager',
-      team: 'A/V & Tech',
-      shift: 'Full Day (09:00 - 18:00)',
-      status: 'confirmed',
-    },
-    {
-      id: 'vol_inno_3',
-      name: 'Rohan Sharma',
-      role: 'Registration Desk',
-      team: 'Logistics',
-      shift: 'Opening Shift (07:30 - 12:00)',
-      status: 'active',
-    },
-    {
-      id: 'vol_inno_4',
-      name: 'Liam Murphy',
-      role: 'Speaker Escort',
-      team: 'Guest Relations',
-      shift: 'Afternoon (12:00 - 17:00)',
-      status: 'todo',
-    },
-    {
-      id: 'vol_inno_5',
-      name: 'Sarah Jenkins',
-      role: 'Hackathon Proctor',
-      team: 'Tech Support',
-      shift: 'Overnight (20:00 - 04:00)',
-      status: 'confirmed',
-    },
-    {
-      id: 'vol_inno_6',
-      name: 'David Kim',
-      role: 'Catering & Refreshments',
-      team: 'Hospitality',
-      shift: 'Lunch Service (11:30 - 15:30)',
-      status: 'active',
-    },
-    {
-      id: 'vol_inno_7',
-      name: 'Priya Nair',
-      role: 'Social Media & Photography',
-      team: 'Marketing',
-      shift: 'Full Day (09:00 - 18:00)',
-      status: 'confirmed',
-    },
-    {
-      id: 'vol_inno_8',
-      name: 'Marcus Vance',
-      role: 'Badge & Kit Distribution',
-      team: 'Logistics',
-      shift: 'Morning (08:00 - 13:00)',
-      status: 'active',
-    },
-    {
-      id: 'vol_inno_9',
-      name: 'Elena Rostova',
-      role: 'First Aid & Safety Liaison',
-      team: 'Operations',
-      shift: 'Evening (16:00 - 22:00)',
-      status: 'confirmed',
-    },
-  ],
-  evt_techfest_2026: [
-    {
-      id: 'vol_tech_1',
-      name: 'Alex Rivera',
-      role: 'Arena Safety Officer',
-      team: 'Robotics Lead',
-      shift: 'Morning (08:30 - 14:00)',
-      status: 'confirmed',
-    },
-    {
-      id: 'vol_tech_2',
-      name: 'Chloe Dupont',
-      role: 'Coding League Proctor',
-      team: 'Academics',
-      shift: 'Midday (11:00 - 16:30)',
-      status: 'active',
-    },
-    {
-      id: 'vol_tech_3',
-      name: 'Tariq Mansoor',
-      role: 'Hardware Inspection',
-      team: 'Tech Crew',
-      shift: 'Opening Shift (08:00 - 12:30)',
-      status: 'confirmed',
-    },
-    {
-      id: 'vol_tech_4',
-      name: 'Ananya Gupta',
-      role: 'VIP Hospitality Host',
-      team: 'Guest Relations',
-      shift: 'Afternoon (13:00 - 18:00)',
-      status: 'confirmed',
-    },
-    {
-      id: 'vol_tech_5',
-      name: 'Lucas Silva',
-      role: 'Live Stream Operator',
-      team: 'Media & Sound',
-      shift: 'Full Day (09:00 - 17:30)',
-      status: 'active',
-    },
-    {
-      id: 'vol_tech_6',
-      name: 'Zoe Washington',
-      role: 'Scoreboard Coordinator',
-      team: 'Operations',
-      shift: 'Finals Shift (14:00 - 19:00)',
-      status: 'todo',
-    },
-  ],
-  evt_aws_workshop_2026: [
-    {
-      id: 'vol_aws_1',
-      name: 'Devin Brooks',
-      role: 'Cloud Lab Assistant',
-      team: 'Technical Mentorship',
-      shift: 'Morning (09:00 - 13:30)',
-      status: 'confirmed',
-    },
-    {
-      id: 'vol_aws_2',
-      name: 'Meera Sundaram',
-      role: 'Check-in & Credential Desk',
-      team: 'Logistics',
-      shift: 'Registration (08:30 - 11:30)',
-      status: 'active',
-    },
-    {
-      id: 'vol_aws_3',
-      name: 'Kevin Zhao',
-      role: 'Sandbox Environment Monitor',
-      team: 'Tech Support',
-      shift: 'Afternoon (13:00 - 17:00)',
-      status: 'confirmed',
-    },
-    {
-      id: 'vol_aws_4',
-      name: 'Natasha Petrova',
-      role: 'Q&A Chat Moderator',
-      team: 'Virtual Operations',
-      shift: 'Full Session (09:30 - 16:30)',
-      status: 'confirmed',
-    },
-    {
-      id: 'vol_aws_5',
-      name: 'Samira Khan',
-      role: 'Swag & Certificate Desk',
-      team: 'Member Experience',
-      shift: 'Wrap-up (15:00 - 18:00)',
-      status: 'todo',
-    },
-  ],
-};
+import {
+  getVolunteersByEvent,
+  createVolunteer,
+  updateVolunteer,
+  deleteVolunteer,
+} from '../services/api';
 
 const avatarColors = [
   'bg-indigo-50 text-indigo-700 border-indigo-200',
@@ -190,19 +26,8 @@ const avatarColors = [
 export default function Volunteers() {
   const { selectedEvent, selectedEventId } = useEventContext();
 
-  // Persistent volunteer storage keyed by eventId
-  const [volunteersByEvent, setVolunteersByEvent] = useState(() => {
-    try {
-      const cached = localStorage.getItem('clubops_volunteers_by_event');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        return { ...defaultVolunteersByEvent, ...parsed };
-      }
-    } catch (err) {
-      console.warn('Failed to parse volunteers cache:', err);
-    }
-    return defaultVolunteersByEvent;
-  });
+  const [currentVolunteers, setCurrentVolunteers] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -219,19 +44,29 @@ export default function Volunteers() {
     status: 'confirmed',
   });
 
-  // Current active event's volunteers
-  const currentVolunteers = volunteersByEvent[selectedEventId] || [];
   const enrolledCount = currentVolunteers.length;
 
-  // Persist helper
-  const persistVolunteers = (newData) => {
-    setVolunteersByEvent(newData);
+  // Load volunteers for current event
+  const fetchVolunteers = async () => {
+    if (!selectedEventId) return;
     try {
-      localStorage.setItem('clubops_volunteers_by_event', JSON.stringify(newData));
+      setLoading(true);
+      const res = await getVolunteersByEvent(selectedEventId);
+      if (res && res.success && Array.isArray(res.data)) {
+        setCurrentVolunteers(res.data);
+      } else {
+        setCurrentVolunteers([]);
+      }
     } catch (err) {
-      console.warn('Failed to persist volunteers:', err);
+      console.warn('Failed to load volunteers from API:', err.message);
+    } finally {
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchVolunteers();
+  }, [selectedEventId]);
 
   // Open Modal for Add or Edit
   const openModal = (volunteer = null) => {
@@ -241,7 +76,7 @@ export default function Volunteers() {
         name: volunteer.name,
         role: volunteer.role,
         team: volunteer.team,
-        shift: volunteer.shift,
+        shift: volunteer.shift || volunteer.availability || '',
         status: volunteer.status,
       });
     } else {
@@ -263,54 +98,56 @@ export default function Volunteers() {
   };
 
   // Handle Form Submit (Add or Edit)
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e) => {
+    if (e) e.preventDefault();
     if (!formData.name.trim() || !formData.role.trim()) return;
 
-    if (editingVolunteer) {
-      // Edit existing volunteer in currently selected event
-      const updatedList = currentVolunteers.map((v) =>
-        v.id === editingVolunteer.id
-          ? {
-              ...v,
-              name: formData.name.trim(),
-              role: formData.role.trim(),
-              team: formData.team.trim(),
-              shift: formData.shift.trim(),
-              status: formData.status,
-            }
-          : v
-      );
-      persistVolunteers({
-        ...volunteersByEvent,
-        [selectedEventId]: updatedList,
-      });
-    } else {
-      // Add new volunteer to currently selected event ONLY
-      const newVolunteer = {
-        id: `vol_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        name: formData.name.trim(),
-        role: formData.role.trim(),
-        team: formData.team.trim(),
-        shift: formData.shift.trim(),
-        status: formData.status,
-      };
-      persistVolunteers({
-        ...volunteersByEvent,
-        [selectedEventId]: [newVolunteer, ...currentVolunteers],
-      });
+    try {
+      if (editingVolunteer) {
+        const id = editingVolunteer._id || editingVolunteer.id;
+        const res = await updateVolunteer(id, {
+          name: formData.name.trim(),
+          role: formData.role.trim(),
+          team: formData.team.trim(),
+          shift: formData.shift.trim(),
+          status: formData.status,
+        });
+        if (res && res.success && res.data) {
+          setCurrentVolunteers((prev) =>
+            prev.map((v) => ((v._id || v.id) === id ? res.data : v))
+          );
+        } else {
+          await fetchVolunteers();
+        }
+      } else {
+        const res = await createVolunteer(selectedEventId, {
+          name: formData.name.trim(),
+          role: formData.role.trim(),
+          team: formData.team.trim(),
+          shift: formData.shift.trim(),
+          status: formData.status,
+        });
+        if (res && res.success && res.data) {
+          setCurrentVolunteers((prev) => [res.data, ...prev]);
+        } else {
+          await fetchVolunteers();
+        }
+      }
+    } catch (err) {
+      console.error('Error saving volunteer:', err);
     }
 
     closeModal();
   };
 
   // Handle Delete (Only from current event)
-  const handleDeleteVolunteer = (id) => {
-    const updatedList = currentVolunteers.filter((v) => v.id !== id);
-    persistVolunteers({
-      ...volunteersByEvent,
-      [selectedEventId]: updatedList,
-    });
+  const handleDeleteVolunteer = async (id) => {
+    try {
+      await deleteVolunteer(id);
+      setCurrentVolunteers((prev) => prev.filter((v) => (v._id || v.id) !== id));
+    } catch (err) {
+      console.error('Error deleting volunteer:', err);
+    }
   };
 
   // Filtered volunteers for search
@@ -444,7 +281,7 @@ export default function Volunteers() {
 
                 return (
                   <div
-                    key={v.id || idx}
+                    key={v._id || v.id || idx}
                     className="p-4 hover:bg-slate-50/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors group"
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
@@ -485,7 +322,7 @@ export default function Volunteers() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteVolunteer(v.id)}
+                          onClick={() => handleDeleteVolunteer(v._id || v.id)}
                           title="Delete Volunteer"
                           className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                         >

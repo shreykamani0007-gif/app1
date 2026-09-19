@@ -136,6 +136,46 @@ export const getTasksByEvent = async (req, res, next) => {
   }
 };
 
+// @desc    Get single task by ID
+// @route   GET /api/tasks/:taskId
+// @access  Public
+export const getTask = async (req, res, next) => {
+  try {
+    const { taskId } = req.params;
+
+    if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(taskId)) {
+      const task = await Task.findById(taskId);
+      if (!task) {
+        return res.status(404).json({
+          success: false,
+          message: `Task not found with id of ${taskId}`,
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        data: task,
+      });
+    }
+
+    // Fallback: In-memory store
+    const task = inMemoryTasks.find((t) => String(t._id) === String(taskId));
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        message: `Task not found with id of ${taskId}`,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: task,
+      database: 'offline_fallback',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Create a new task for an event
 // @route   POST /api/events/:eventId/tasks
 // @access  Public

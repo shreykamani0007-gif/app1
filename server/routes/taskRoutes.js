@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getTasksByEvent,
+  getTask,
   createTask,
   updateTask,
   deleteTask,
@@ -14,7 +15,9 @@ router.route('/')
   .post(createTask);
 
 router.route('/:taskId')
+  .get(getTask)
   .put(updateTask)
+  .patch(updateTask)
   .delete(deleteTask);
 
 export default router;

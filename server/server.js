@@ -3,17 +3,24 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import connectDB from './config/db.js';
+import { seedInitialData } from './config/seed.js';
 import eventRoutes from './routes/eventRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
 import meetingRoutes from './routes/meetingRoutes.js';
+import volunteerRoutes from './routes/volunteerRoutes.js';
+import documentRoutes from './routes/documentRoutes.js';
+import riskRoutes from './routes/riskRoutes.js';
+import announcementRoutes from './routes/announcementRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
 
 // Load environment variables
 dotenv.config();
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB and seed default data if needed
+await connectDB();
+await seedInitialData();
 
 const app = express();
 
@@ -25,7 +32,7 @@ app.use(cors({
     'http://127.0.0.1:5173',
     'http://127.0.0.1:3000',
   ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
@@ -43,10 +50,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Event, Task, and Meeting API routes
+// Mount API routes
 app.use('/api/events', eventRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/volunteers', volunteerRoutes);
 app.use('/api/meetings', meetingRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/risks', riskRoutes);
+app.use('/api/announcements', announcementRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/ai', aiRoutes);
 
 // 404 handler for undefined routes

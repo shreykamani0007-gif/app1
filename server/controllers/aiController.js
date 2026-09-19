@@ -3,6 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 import Event from '../models/Event.js';
 import Task from '../models/Task.js';
 import Meeting from '../models/Meeting.js';
+import Volunteer from '../models/Volunteer.js';
 import { inMemoryEvents } from './eventController.js';
 import { inMemoryTasks } from './taskController.js';
 import { inMemoryMeetings } from './meetingController.js';
@@ -60,7 +61,16 @@ async function fetchMeetings(eventId) {
 /**
  * Helper to fetch volunteers for an event
  */
-function fetchVolunteers(eventId) {
+async function fetchVolunteers(eventId) {
+  if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(eventId)) {
+    try {
+      const dbVolunteers = await Volunteer.find({ eventId });
+      if (dbVolunteers && dbVolunteers.length > 0) return dbVolunteers;
+    } catch {
+      // Fall through
+    }
+  }
+
   if (defaultVolunteersByEvent && defaultVolunteersByEvent[eventId]) {
     return defaultVolunteersByEvent[eventId];
   }
@@ -177,11 +187,11 @@ export const handleAiChat = async (req, res) => {
     // Resolve event details and operational datasets
     const event = await fetchEvent(eventId);
     const resolvedEventId = event._id || eventId;
-    const [tasks, meetings] = await Promise.all([
+    const [tasks, meetings, volunteers] = await Promise.all([
       fetchTasks(resolvedEventId),
       fetchMeetings(resolvedEventId),
+      fetchVolunteers(resolvedEventId),
     ]);
-    const volunteers = fetchVolunteers(resolvedEventId);
 
     const systemInstruction = buildSystemPrompt(event, tasks, meetings, volunteers);
 
