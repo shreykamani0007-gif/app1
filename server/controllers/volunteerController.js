@@ -137,10 +137,14 @@ export const createVolunteer = async (req, res, next) => {
     }
 
     if (mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(eventId)) {
+      const volunteerEmail = (email && email.trim())
+        ? email.trim().toLowerCase()
+        : `${name.trim().toLowerCase().replace(/[^a-z0-9]/g, '.')}@volunteer.campus.edu`;
+
       const volunteer = await Volunteer.create({
         eventId,
         name: name.trim(),
-        email: email ? email.trim().toLowerCase() : '',
+        email: volunteerEmail,
         phone: phone ? phone.trim() : '',
         role: role ? role.trim() : 'Volunteer',
         team: team ? team.trim() : 'General',
