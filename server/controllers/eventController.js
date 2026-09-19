@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import Event from '../models/Event.js';
 
 // In-memory fallback store when MongoDB is not actively connected
-let inMemoryEvents = [
+export let inMemoryEvents = [
   {
     _id: 'evt_innovatex_2026',
     name: 'InnovateX Fest 2026',

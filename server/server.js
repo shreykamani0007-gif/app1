@@ -6,6 +6,7 @@ import connectDB from './config/db.js';
 import eventRoutes from './routes/eventRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
 import meetingRoutes from './routes/meetingRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
 
 // Load environment variables
@@ -46,6 +47,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/events', eventRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/meetings', meetingRoutes);
+app.use('/api/ai', aiRoutes);
 
 // 404 handler for undefined routes
 app.use((req, res) => {

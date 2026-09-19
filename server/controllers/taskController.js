@@ -3,7 +3,7 @@ import Task from '../models/Task.js';
 import Event from '../models/Event.js';
 
 // In-memory fallback tasks linked to specific events
-let inMemoryTasks = [
+export let inMemoryTasks = [
   // InnovateX Fest 2026 tasks
   {
     _id: 'task_inno_1',

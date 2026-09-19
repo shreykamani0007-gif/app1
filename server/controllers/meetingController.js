@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import Meeting from '../models/Meeting.js';
 
 // In-memory fallback meetings linked to specific events
-let inMemoryMeetings = [
+export let inMemoryMeetings = [
   // InnovateX Fest 2026 Meetings
   {
     _id: 'meet_inno_1',

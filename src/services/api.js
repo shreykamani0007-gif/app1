@@ -157,4 +157,21 @@ export async function deleteMeeting(meetingId) {
   });
 }
 
+/**
+ * Send message to ClubOps AI copilot
+ */
+export async function sendAiMessage(message, eventId, history = []) {
+  return request('/ai/chat', {
+    method: 'POST',
+    body: JSON.stringify({ message, eventId, history }),
+  });
+}
+
+/**
+ * Get AI service configuration status
+ */
+export async function getAiStatus() {
+  return request('/ai/status');
+}
+
 
