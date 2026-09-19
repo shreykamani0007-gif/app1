@@ -13,6 +13,8 @@ const statusConfig = {
   resolved: { label: 'Resolved', bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' },
   active: { label: 'Active', bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   confirmed: { label: 'Confirmed', bg: 'bg-indigo-50', text: 'text-indigo-700', dot: 'bg-indigo-500' },
+  critical: { label: 'Critical Risk', bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-600' },
+  monitoring: { label: 'Monitoring', bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
 };
 
 export default function StatusBadge({ status, label, className = '' }) {
