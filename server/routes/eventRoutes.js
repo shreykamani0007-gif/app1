@@ -7,11 +7,13 @@ import {
   deleteEvent,
 } from '../controllers/eventController.js';
 import taskRoutes from './taskRoutes.js';
+import meetingRoutes from './meetingRoutes.js';
 
 const router = express.Router();
 
-// Re-route into task router
+// Re-route into task and meeting routers
 router.use('/:eventId/tasks', taskRoutes);
+router.use('/:eventId/meetings', meetingRoutes);
 
 router.route('/')
   .get(getEvents)

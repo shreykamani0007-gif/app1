@@ -114,3 +114,47 @@ export async function deleteTask(taskId) {
   });
 }
 
+/**
+ * Get all meetings belonging to an event
+ */
+export async function getMeetingsByEvent(eventId) {
+  return request(`/events/${eventId}/meetings`);
+}
+
+/**
+ * Get single meeting by ID
+ */
+export async function getMeeting(meetingId) {
+  return request(`/meetings/${meetingId}`);
+}
+
+/**
+ * Create a new meeting for an event
+ */
+export async function createMeeting(eventId, meetingData) {
+  return request(`/events/${eventId}/meetings`, {
+    method: 'POST',
+    body: JSON.stringify(meetingData),
+  });
+}
+
+/**
+ * Update a meeting by ID
+ */
+export async function updateMeeting(meetingId, meetingData) {
+  return request(`/meetings/${meetingId}`, {
+    method: 'PUT',
+    body: JSON.stringify(meetingData),
+  });
+}
+
+/**
+ * Delete a meeting by ID
+ */
+export async function deleteMeeting(meetingId) {
+  return request(`/meetings/${meetingId}`, {
+    method: 'DELETE',
+  });
+}
+
+

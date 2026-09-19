@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 import eventRoutes from './routes/eventRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
+import meetingRoutes from './routes/meetingRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
 
 // Load environment variables
@@ -41,9 +42,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Event and Task API routes
+// Event, Task, and Meeting API routes
 app.use('/api/events', eventRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/meetings', meetingRoutes);
 
 // 404 handler for undefined routes
 app.use((req, res) => {
