@@ -10,6 +10,8 @@ import Documents from './pages/Documents';
 import Risks from './pages/Risks';
 import Announcements from './pages/Announcements';
 import AiAssistant from './pages/AiAssistant';
+import Profile from './pages/Profile';
+import Settings from './pages/Settings';
 
 export default function App() {
   return (
@@ -30,6 +32,8 @@ export default function App() {
         <Route path="/risks" element={<Risks />} />
         <Route path="/announcements" element={<Announcements />} />
         <Route path="/ai-assistant" element={<AiAssistant />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
 
       {/* Fallback redirect to /login */}
