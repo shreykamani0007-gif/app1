@@ -12,6 +12,7 @@ import documentRoutes from './routes/documentRoutes.js';
 import riskRoutes from './routes/riskRoutes.js';
 import announcementRoutes from './routes/announcementRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
 
@@ -59,6 +60,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/risks', riskRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/ai', aiRoutes);
 
 // 404 handler for undefined routes

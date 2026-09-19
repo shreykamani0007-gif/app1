@@ -5,9 +5,14 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
  */
 async function request(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
+  
+  const token = typeof window !== 'undefined' ? localStorage.getItem('clubops_auth_token') : null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
   const config = {
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
       ...options.headers,
     },
     ...options,
@@ -316,4 +321,30 @@ export async function createUser(userData) {
   });
 }
 
+/**
+ * Authentication API
+ */
+export async function registerUser(credentials) {
+  return request('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(credentials),
+  });
+}
 
+export async function loginUser(credentials) {
+  return request('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(credentials),
+  });
+}
+
+export async function getCurrentUser() {
+  return request('/auth/me');
+}
+
+export async function googleAuthUser(payload = {}) {
+  return request('/auth/google', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

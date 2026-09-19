@@ -6,6 +6,7 @@ import Volunteer from '../models/Volunteer.js';
 import Document from '../models/Document.js';
 import Risk from '../models/Risk.js';
 import Announcement from '../models/Announcement.js';
+import User from '../models/User.js';
 
 export const seedInitialData = async () => {
   try {
@@ -309,6 +310,18 @@ export const seedInitialData = async () => {
         status: 'Sent',
       },
     ]);
+
+    // 10. Seed Initial Demo User
+    const userCount = await User.countDocuments();
+    if (userCount === 0) {
+      await User.create({
+        name: 'Alex Chen',
+        email: 'alex.chen@clubops.org',
+        password: 'Password123!',
+        role: 'Organizer',
+      });
+      console.log('[MongoDB Seed] Demo user created: alex.chen@clubops.org / Password123!');
+    }
 
     console.log('[MongoDB Seed] Initial data successfully seeded into database collections.');
   } catch (err) {

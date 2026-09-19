@@ -16,10 +16,12 @@ import {
   X
 } from 'lucide-react';
 import { useEventContext } from '../../context/EventContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Navbar({ onOpenSidebar }) {
   const navigate = useNavigate();
   const { selectedEvent } = useEventContext();
+  const { user, logout } = useAuth();
 
   // Notification state
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -99,6 +101,23 @@ export default function Navbar({ onOpenSidebar }) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const userName = user?.name || 'Club Organizer';
+  const userEmail = user?.email || 'organizer@clubops.org';
+  const userRole = user?.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : 'Event Lead · CS Club';
+  const userInitials = userName
+    .split(' ')
+    .map(part => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'CO';
+
+  const handleLogout = () => {
+    setProfileOpen(false);
+    logout();
+    navigate('/login');
+  };
 
   return (
     <header className="h-16 bg-white border-b border-slate-200/80 sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -249,11 +268,11 @@ export default function Navbar({ onOpenSidebar }) {
             className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-brand-500/20"
           >
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold text-xs flex items-center justify-center shadow-sm shrink-0">
-              AC
+              {userInitials}
             </div>
             <div className="hidden xl:block">
-              <p className="text-xs font-semibold text-slate-800 leading-tight">Alex Chen</p>
-              <p className="text-[10px] text-slate-500">Event Lead · CS Club</p>
+              <p className="text-xs font-semibold text-slate-800 leading-tight">{userName}</p>
+              <p className="text-[10px] text-slate-500">{userRole}</p>
             </div>
             <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -263,9 +282,9 @@ export default function Navbar({ onOpenSidebar }) {
             <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 py-1.5 divide-y divide-slate-100 overflow-hidden animate-fadeIn">
               {/* User Overview Header */}
               <div className="px-4 py-3 bg-slate-50/70">
-                <p className="text-xs font-bold text-slate-900">Alex Chen</p>
-                <p className="text-[11px] font-semibold text-brand-600 mt-0.5">Event Lead · CS Club</p>
-                <p className="text-[10px] text-slate-400 mt-0.5 truncate">alex.chen@clubops.org</p>
+                <p className="text-xs font-bold text-slate-900">{userName}</p>
+                <p className="text-[11px] font-semibold text-brand-600 mt-0.5">{userRole}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5 truncate">{userEmail}</p>
               </div>
 
               {/* Navigation Links */}
@@ -299,10 +318,7 @@ export default function Navbar({ onOpenSidebar }) {
               <div className="py-1">
                 <button
                   type="button"
-                  onClick={() => {
-                    setProfileOpen(false);
-                    navigate('/login');
-                  }}
+                  onClick={handleLogout}
                   className="w-full text-left px-4 py-2 text-xs flex items-center gap-2.5 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer font-medium"
                 >
                   <LogOut className="w-4 h-4 text-rose-500" />

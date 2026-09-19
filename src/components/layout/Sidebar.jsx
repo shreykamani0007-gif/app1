@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   CheckSquare,
@@ -15,6 +15,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { useEventContext } from '../../context/EventContext';
+import { useAuth } from '../../context/AuthContext';
 
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -29,6 +30,23 @@ const navItems = [
 
 export default function Sidebar({ isOpen, onClose }) {
   const { selectedEvent } = useEventContext();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const userName = user?.name || 'Club Organizer';
+  const userRole = user?.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : 'Event Lead • CS Club';
+  const userInitials = userName
+    .split(' ')
+    .map(part => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'CO';
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <>
@@ -129,20 +147,21 @@ export default function Sidebar({ isOpen, onClose }) {
           <div className="p-2 rounded-xl bg-slate-800/40 hover:bg-slate-800/80 transition-colors flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-400 to-brand-500 flex items-center justify-center font-bold text-xs text-slate-900 shrink-0 shadow-inner">
-                AC
+                {userInitials}
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-200 truncate">Alex Chen</p>
-                <p className="text-[11px] text-slate-400 truncate">Event Lead • CS Club</p>
+                <p className="text-xs font-semibold text-slate-200 truncate">{userName}</p>
+                <p className="text-[11px] text-slate-400 truncate">{userRole}</p>
               </div>
             </div>
-            <Link
-              to="/login"
+            <button
+              type="button"
+              onClick={handleLogout}
               title="Sign Out"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700/50 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700/50 transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
-            </Link>
+            </button>
           </div>
         </div>
       </aside>

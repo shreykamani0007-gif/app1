@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Zap,
   ArrowRight,
@@ -14,12 +14,20 @@ import {
   Info
 } from 'lucide-react';
 import Button from '../components/ui/Button';
+import { useAuth } from '../context/AuthContext';
 
-export default function Login() {
+export default function Login({ defaultMode = 'login' }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login, register, loginWithGoogle } = useAuth();
 
   // Mode: 'login' or 'register'
-  const [mode, setMode] = useState('login');
+  const [mode, setMode] = useState(defaultMode);
+
+  // Sync mode with prop
+  useEffect(() => {
+    setMode(defaultMode);
+  }, [defaultMode]);
 
   // Form fields
   const [fullName, setFullName] = useState('');
@@ -35,6 +43,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   // Switch tab mode and clear errors
   const handleModeSwitch = (newMode) => {
@@ -43,14 +52,27 @@ export default function Login() {
     setInfoMessage('');
   };
 
-  // Google OAuth UI placeholder handler
-  const handleGoogleAuth = () => {
+  // Google OAuth handler with instant one-click demo login
+  const handleGoogleAuth = async () => {
     setError('');
-    setInfoMessage('Google authentication will be connected soon. Please use the form above to explore the demo.');
+    setInfoMessage('');
+    setIsGoogleLoading(true);
+    try {
+      await loginWithGoogle({
+        name: fullName.trim() || 'Alex Chen (Google)',
+        email: email.trim() || 'alex.chen.google@clubops.org',
+      });
+      setIsGoogleLoading(false);
+      const destination = location.state?.from?.pathname || '/dashboard';
+      navigate(destination, { replace: true });
+    } catch (err) {
+      setIsGoogleLoading(false);
+      setError(err.message || 'Google Sign-In failed. Please try again.');
+    }
   };
 
-  // Form submission handler with frontend validation
-  const handleSubmit = (e) => {
+  // Form submission handler with real authentication
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setInfoMessage('');
@@ -86,16 +108,34 @@ export default function Login() {
         setError('Passwords do not match. Please verify your confirm password.');
         return;
       }
+
+      // Real Registration
+      try {
+        setIsLoading(true);
+        const res = await register(fullName.trim(), email.trim(), password);
+        setIsLoading(false);
+        setInfoMessage(res.message || 'Account created successfully! Please sign in with your credentials.');
+        setMode('login');
+        setPassword('');
+        setConfirmPassword('');
+      } catch (err) {
+        setIsLoading(false);
+        setError(err.message || 'Registration failed. Please try again.');
+      }
+      return;
     }
 
-    // Temporary frontend mock authentication behavior
-    setIsLoading(true);
-
-    setTimeout(() => {
+    // Real Login
+    try {
+      setIsLoading(true);
+      await login(email.trim(), password);
       setIsLoading(false);
-      // Navigate to the Dashboard upon successful mock auth submission
-      navigate('/dashboard');
-    }, 600);
+      const destination = location.state?.from?.pathname || '/dashboard';
+      navigate(destination, { replace: true });
+    } catch (err) {
+      setIsLoading(false);
+      setError(err.message || 'Invalid email or password. Please check your credentials.');
+    }
   };
 
   return (
@@ -308,6 +348,28 @@ export default function Login() {
             </div>
           </form>
 
+          {/* Demo Account Quick Fill */}
+          {mode === 'login' && (
+            <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs animate-fadeIn">
+              <div className="truncate pr-2">
+                <span className="font-bold text-slate-800 block text-xs">Demo Organizer Account</span>
+                <span className="text-slate-500 font-mono text-[11px]">alex.chen@clubops.org</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('alex.chen@clubops.org');
+                  setPassword('Password123!');
+                  setError('');
+                  setInfoMessage('');
+                }}
+                className="px-3 py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors shrink-0 cursor-pointer shadow-2xs"
+              >
+                Auto-fill
+              </button>
+            </div>
+          )}
+
           {/* Divider */}
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
@@ -324,28 +386,38 @@ export default function Login() {
           <div>
             <button
               type="button"
+              disabled={isGoogleLoading || isLoading}
               onClick={handleGoogleAuth}
-              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 text-xs sm:text-sm font-semibold transition-all shadow-2xs hover:shadow-xs cursor-pointer"
+              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 text-xs sm:text-sm font-semibold transition-all shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-60"
             >
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              <span>Continue with Google</span>
+              {isGoogleLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-brand-600" />
+                  <span>Connecting with Google...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  <span>Continue with Google</span>
+                </>
+              )}
             </button>
           </div>
 
