@@ -337,7 +337,6 @@ export async function loginUser(credentials) {
     body: JSON.stringify(credentials),
   });
 }
-
 export async function getCurrentUser() {
   return request('/auth/me');
 }
@@ -348,3 +347,14 @@ export async function googleAuthUser(payload = {}) {
     body: JSON.stringify(payload),
   });
 }
+
+/**
+ * AI Action Execution API
+ */
+export async function executeAiAction(actionData) {
+  return request('/ai/execute-action', {
+    method: 'POST',
+    body: JSON.stringify(actionData),
+  });
+}
+

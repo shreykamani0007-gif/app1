@@ -110,6 +110,31 @@ async function fetchVolunteers(eventId) {
 export function detectQueryIntent(message) {
   const text = (message || '').toLowerCase().trim();
 
+  // Action intents: create task, assign task, create risk, schedule meeting, draft announcement
+  const isCreateTask = /\b(create|add|make|set up|open)\s+(a\s+)?([a-z0-9\s_-]+?\s+)?(task|todo|to-do|action item)\b/i.test(text);
+  const isAssignTask = /\b(assign|allocate|give)\s+(the\s+)?([a-z0-9\s_-]+)?\s*(task|todo)\s+to\s+([a-z0-9\s_-]+)/i.test(text) || /\bassign\s+([a-z0-9\s_-]+)\s+to\b/i.test(text);
+  const isCreateRisk = /\b(create|add|log|record|flag|identify)\s+(a\s+)?([a-z0-9\s_-]+?\s+)?risk\b/i.test(text);
+  const isCreateMeeting = /\b(schedule|create|set up|plan|arrange)\s+(a\s+)?([a-z0-9\s_-]+?\s+)?(meeting|sync|huddle|call)\b/i.test(text);
+  const isDraftAnnouncement = /\b(draft|create|prepare|write)\s+(an?\s+)?([a-z0-9\s_-]+?\s+)?(announcement|broadcast|notice|reminder)\b/i.test(text);
+
+  if (isCreateTask || isAssignTask || isCreateRisk || isCreateMeeting || isDraftAnnouncement) {
+    let actionType = 'CREATE_TASK';
+    if (isAssignTask) actionType = 'ASSIGN_TASK';
+    else if (isCreateRisk) actionType = 'CREATE_RISK';
+    else if (isCreateMeeting) actionType = 'CREATE_MEETING';
+    else if (isDraftAnnouncement) actionType = 'DRAFT_ANNOUNCEMENT';
+
+    return {
+      type: 'event_action',
+      actionType,
+      needsTasks: true,
+      needsMeetings: isCreateMeeting,
+      needsRisks: isCreateRisk,
+      needsVolunteers: isDraftAnnouncement || isAssignTask,
+      needsEvent: true,
+    };
+  }
+
   // Short conversational greetings
   const isGreeting =
     /^(hi|hello|hey|greetings|howdy|sup|good\s+(morning|afternoon|evening))\b/i.test(text) &&
@@ -290,12 +315,29 @@ Description: ${event.description || 'None'}`);
 
   return `You are ClubOps AI, a collegiate event operations copilot.
 
-CRITICAL DATABASE GROUNDING RULES:
+CRITICAL DATABASE GROUNDING & ACTION PROTOCOL:
 1. Base your answer EXCLUSIVELY on the REAL database records provided below for the active event.
-2. NEVER invent, hallucinate, or extrapolate facts, tasks, meetings, dates, volunteers, or risks that are not present in the data.
-3. If specific information is requested but does not exist or is empty in the database (e.g. no overdue tasks, no meetings scheduled, no risks logged, or specific person not assigned), clearly state that it is unavailable or not found in the database.
-4. This session is READ + GENERATE only. Do not attempt or claim to modify or delete database records.
-5. Format your responses with clear markdown: bullet points, bold text, and clean structure.
+2. NEVER invent or hallucinate facts, tasks, meetings, dates, volunteers, or risks that are not present in the data.
+3. If specific information is requested but does not exist in the database, clearly state that it is unavailable.
+4. ACTION PROPOSALS & WORKFLOWS:
+When the user asks to create a task, assign a task, update a task, create a risk, schedule a meeting, or draft an announcement:
+- Propose the action, but NEVER claim that the action was already saved or executed.
+- Request explicit user review and confirmation.
+- Output a single structured action block in this EXACT format at the very end of your response:
+\`\`\`action
+{
+  "type": "CREATE_TASK" | "UPDATE_TASK" | "ASSIGN_TASK" | "CREATE_RISK" | "CREATE_MEETING" | "DRAFT_ANNOUNCEMENT",
+  "payload": { ... }
+}
+\`\`\`
+Payload specifications:
+- CREATE_TASK: { "title": string, "priority": "Low"|"Medium"|"High"|"Urgent", "deadline": string, "department": string, "status": "In Progress"|"To Do" }
+- ASSIGN_TASK: { "taskTitle": string, "assignee": string }
+- CREATE_RISK: { "title": string, "severity": "low"|"medium"|"high"|"critical"|"urgent", "probability": "low"|"medium"|"high", "category": string, "impact": "Medium" }
+- CREATE_MEETING: { "title": string, "date": "YYYY-MM-DD", "startTime": "05:00 PM", "endTime": "06:00 PM", "meetingType": "In-person"|"Online"|"Hybrid", "location": string, "agenda": string }
+- DRAFT_ANNOUNCEMENT: { "title": string, "body": string, "audience": "All Volunteers", "status": "Draft" }
+
+5. Format responses with clear markdown: bullet points, bold text, and clean structure.
 
 REAL DATABASE DATA:
 ==================================================
@@ -308,6 +350,117 @@ ${sections.join('\n\n')}
  */
 function generateFallbackResponse(message, event, data, intent) {
   const query = (message || '').toLowerCase().trim();
+
+  // Action intents fallback
+  if (intent.type === 'event_action') {
+    const actType = intent.actionType;
+    if (actType === 'CREATE_TASK') {
+      const isHigh = /\bhigh\s+priority\b/i.test(query);
+      const isUrgent = /\burgent\b/i.test(query);
+      const priority = isUrgent ? 'Urgent' : isHigh ? 'High' : 'Medium';
+      const deadlineMatch = query.match(/\bby\s+([a-z0-9\s,]+?)(?:\.|$)/i);
+      const deadline = deadlineMatch ? deadlineMatch[1].trim() : 'October 20';
+      let title = query
+        .replace(/^(please\s+)?(can you\s+)?(create|add|make|set up)\s+(a\s+)?(high\s+priority\s+|urgent\s+)?task\s+(to\s+|for\s+)?/i, '')
+        .replace(/\s+by\s+[a-z0-9\s,]+(?:\.|$)/i, '')
+        .replace(/[.]+$/, '')
+        .trim();
+      if (!title) title = 'Volunteer registration';
+      title = title.charAt(0).toUpperCase() + title.slice(1);
+
+      return `I have prepared a new task **"${title}"** with **${priority}** priority for **${event?.name || 'the active event'}**. Please review the details below and confirm to save it to the database.
+\`\`\`action
+{
+  "type": "CREATE_TASK",
+  "payload": {
+    "title": "${title}",
+    "priority": "${priority}",
+    "deadline": "${deadline}",
+    "department": "${/auditorium|venue|stage/i.test(title) ? 'Logistics' : 'General'}",
+    "status": "In Progress"
+  }
+}
+\`\`\``;
+    }
+
+    if (actType === 'ASSIGN_TASK') {
+      const toMatch = query.match(/\bto\s+([A-Za-z\s]+?)(?:\.|$)/i);
+      const assignee = toMatch ? toMatch[1].trim() : 'Rahul';
+      const taskTitle = query.includes('auditorium') ? 'Arrange auditorium' : 'Volunteer registration';
+
+      return `I have prepared an assignment proposal for **${taskTitle}** to assign it to **${assignee}**. Please review and confirm below.
+\`\`\`action
+{
+  "type": "ASSIGN_TASK",
+  "payload": {
+    "taskTitle": "${taskTitle}",
+    "assignee": "${assignee}"
+  }
+}
+\`\`\``;
+    }
+
+    if (actType === 'CREATE_RISK') {
+      let title = query
+        .replace(/^(please\s+)?(can you\s+)?(create|add|log|record)\s+(a\s+)?risk\s+(for\s+|of\s+|about\s+)?/i, '')
+        .replace(/[.]+$/, '')
+        .trim();
+      if (!title) title = 'Possible auditorium delay';
+      title = title.charAt(0).toUpperCase() + title.slice(1);
+
+      return `I have prepared a new operational risk entry for **"${title}"** in **${event?.name || 'the active event'}**. Please review the parameters and confirm to record it in the database.
+\`\`\`action
+{
+  "type": "CREATE_RISK",
+  "payload": {
+    "title": "${title}",
+    "severity": "medium",
+    "probability": "medium",
+    "category": "Venue & Logistics",
+    "impact": "Medium",
+    "mitigation": "Establish backup venue timeline and buffer slots."
+  }
+}
+\`\`\``;
+    }
+
+    if (actType === 'CREATE_MEETING') {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const dateStr = tomorrow.toISOString().split('T')[0];
+
+      return `I have scheduled a proposal for the **Logistics Coordination Sync** for tomorrow at **5:00 PM**. Please review the details below and confirm to save it to the calendar.
+\`\`\`action
+{
+  "type": "CREATE_MEETING",
+  "payload": {
+    "title": "Logistics Coordination Sync",
+    "date": "${dateStr}",
+    "startTime": "05:00 PM",
+    "endTime": "06:00 PM",
+    "meetingType": "In-person",
+    "location": "Auditorium Control Room",
+    "agenda": "Review equipment setup, volunteer deployment, and safety readiness."
+  }
+}
+\`\`\``;
+    }
+
+    if (actType === 'DRAFT_ANNOUNCEMENT') {
+      return `I have prepared a draft announcement for volunteers regarding early arrival. As required by protocol, this is created as a **Draft** only and will not be broadcast until you review and publish it.
+\`\`\`action
+{
+  "type": "DRAFT_ANNOUNCEMENT",
+  "payload": {
+    "title": "Volunteer Reminder: Early Arrival for Briefing",
+    "body": "Hello volunteers! Please remember to report to the registration desk 45 minutes prior to event start for badge distribution and briefing. Thank you!",
+    "audience": "All Volunteers",
+    "status": "Draft"
+  }
+}
+\`\`\``;
+    }
+  }
 
   // Greetings
   if (intent.type === 'general' && /^(hi|hello|hey|greetings|howdy|sup)\b/i.test(query)) {
@@ -503,6 +656,167 @@ export const getAiStatus = async (req, res) => {
 };
 
 /**
+ * Parse structured action proposals from Gemini response or user intent
+ */
+export function parseActionProposal(replyText, userMessage, event) {
+  let cleanReply = (replyText || '').trim();
+  let action = null;
+
+  // 1. Check if response contains an ```action ... ``` code block
+  const actionBlockRegex = /```(?:action|json)?\s*(\{[\s\S]*?"type"\s*:\s*"(?:CREATE_TASK|UPDATE_TASK|ASSIGN_TASK|CREATE_RISK|CREATE_MEETING|DRAFT_ANNOUNCEMENT)"[\s\S]*?\})\s*```/i;
+  const match = cleanReply.match(actionBlockRegex);
+
+  if (match && match[1]) {
+    try {
+      action = JSON.parse(match[1]);
+      // Cleanly remove action code block from chat text
+      cleanReply = cleanReply.replace(match[0], '').trim();
+    } catch (e) {
+      console.warn('[Action Parse Warning]:', e.message);
+    }
+  }
+
+  // 2. If no action block found in reply, inspect user's message to build the proposal
+  if (!action && userMessage) {
+    const text = userMessage.trim();
+
+    // A. Create task
+    if (/\b(create|add|make|set up)\s+(a\s+)?([a-z0-9\s_-]+?\s+)?(task|to-do|todo)\b/i.test(text)) {
+      const isHigh = /\bhigh\s+priority\b/i.test(text);
+      const isUrgent = /\burgent\b/i.test(text);
+      const priority = isUrgent ? 'Urgent' : isHigh ? 'High' : 'Medium';
+
+      const deadlineMatch = text.match(/\bby\s+([a-z0-9\s,]+?)(?:\.|$)/i);
+      const deadline = deadlineMatch ? deadlineMatch[1].trim() : 'October 20';
+
+      let title = text
+        .replace(/^(please\s+)?(can you\s+)?(create|add|make|set up)\s+(a\s+)?([a-z0-9\s_-]+?\s+)?task\s+(to\s+|for\s+)?/i, '')
+        .replace(/\s+by\s+[a-z0-9\s,]+(?:\.|$)/i, '')
+        .replace(/[.]+$/, '')
+        .trim();
+      if (!title) title = 'Volunteer registration';
+      title = title.charAt(0).toUpperCase() + title.slice(1);
+
+      action = {
+        type: 'CREATE_TASK',
+        payload: {
+          title,
+          priority,
+          deadline,
+          status: 'In Progress',
+          department: /auditorium|venue|stage/i.test(title) ? 'Logistics' : /registration/i.test(title) ? 'Registration' : 'General',
+        },
+      };
+
+      if (!cleanReply || cleanReply.length < 20) {
+        cleanReply = `I have prepared a proposal to create this task for **${event?.name || 'the active event'}**. Please review the details below and confirm to save it to the database.`;
+      }
+    }
+
+    // B. Assign task
+    else if (/\bassign\b/i.test(text) && /\bto\b/i.test(text)) {
+      const toMatch = text.match(/\bto\s+([A-Za-z\s]+?)(?:\.|$)/i);
+      const assignee = toMatch ? toMatch[1].trim() : 'Rahul';
+      const taskTitle = text.toLowerCase().includes('auditorium') ? 'Arrange auditorium' : 'Volunteer registration';
+
+      action = {
+        type: 'ASSIGN_TASK',
+        payload: {
+          taskTitle,
+          assignee,
+        },
+      };
+
+      if (!cleanReply || cleanReply.length < 20) {
+        cleanReply = `I have prepared an assignment proposal for **${taskTitle}** to assign it to **${assignee}**. Please review and confirm below.`;
+      }
+    }
+
+    // C. Create risk
+    else if (/\b(create|add|log|record)\s+(a\s+)?([a-z0-9\s_-]+?\s+)?risk\b/i.test(text)) {
+      let title = text
+        .replace(/^(please\s+)?(can you\s+)?(create|add|log|record)\s+(a\s+)?([a-z0-9\s_-]+?\s+)?risk\s+(for\s+|of\s+|about\s+)?/i, '')
+        .replace(/[.]+$/, '')
+        .trim();
+      if (!title) title = 'Possible auditorium delay';
+      title = title.charAt(0).toUpperCase() + title.slice(1);
+
+      action = {
+        type: 'CREATE_RISK',
+        payload: {
+          title,
+          severity: /high|critical/i.test(text) ? 'high' : 'medium',
+          probability: 'medium',
+          category: /auditorium|venue/i.test(title) ? 'Venue & Logistics' : 'Operational',
+          impact: 'Medium',
+          mitigation: 'Establish backup timeline and reserve standby slots.',
+        },
+      };
+
+      if (!cleanReply || cleanReply.length < 20) {
+        cleanReply = `I have logged an operational risk entry for **"${title}"** in **${event?.name || 'the active event'}**. Please review and confirm to record it in the database.`;
+      }
+    }
+
+    // D. Create meeting
+    else if (/\b(schedule|create|set up|plan|arrange)\s+(a\s+)?([a-z0-9\s_-]+?\s+)?(meeting|sync|huddle|call)\b/i.test(text)) {
+      const timeMatch = text.match(/\bat\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+      const startTime = timeMatch ? timeMatch[1].trim().toUpperCase() : '05:00 PM';
+
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const dateStr = tomorrow.toISOString().split('T')[0];
+
+      let title = 'Logistics Coordination Sync';
+      if (/volunteer/i.test(text)) title = 'Volunteer Orientation Sync';
+
+      action = {
+        type: 'CREATE_MEETING',
+        payload: {
+          title,
+          date: dateStr,
+          startTime: startTime.includes('M') ? startTime : `${startTime} PM`,
+          endTime: '06:00 PM',
+          meetingType: 'In-person',
+          location: 'Auditorium Control Room',
+          agenda: 'Review equipment setup, volunteer deployment, and safety readiness.',
+        },
+      };
+
+      if (!cleanReply || cleanReply.length < 20) {
+        cleanReply = `I have scheduled a proposal for the **${title}** for tomorrow at ${action.payload.startTime}. Please confirm to save it to the calendar.`;
+      }
+    }
+
+    // E. Draft announcement
+    else if (/\b(draft|create|prepare|write)\s+(an?\s+)?([a-z0-9\s_-]+?\s+)?(announcement|broadcast|notice|reminder)\b/i.test(text)) {
+      action = {
+        type: 'DRAFT_ANNOUNCEMENT',
+        payload: {
+          title: 'Volunteer Reminder: Early Arrival for Briefing',
+          body: 'Hello volunteers! Please remember to report to the registration desk 45 minutes prior to doors opening for badge distribution and briefing. Thank you for your commitment!',
+          audience: 'All Volunteers',
+          status: 'Draft',
+        },
+      };
+
+      if (!cleanReply || cleanReply.length < 20) {
+        cleanReply = `I have prepared a draft announcement for volunteers. As required by protocol, this is created as a **Draft** only and will not be broadcast until you review and publish it.`;
+      }
+    }
+  }
+
+  // Bind active event details
+  if (action) {
+    action.id = `act_${Date.now()}`;
+    action.eventId = event?._id || 'evt_default';
+    action.eventName = event?.name || 'Active Event';
+  }
+
+  return { cleanReply, action };
+}
+
+/**
  * @desc    Process AI chat query with database-aware context and Gemini API
  * @route   POST /api/ai/chat
  * @access  Public
@@ -575,11 +889,14 @@ export const handleAiChat = async (req, res) => {
     // Fallback if no API key is provided
     if (!apiKey || apiKey === 'your_gemini_api_key_here' || apiKey.trim() === '') {
       const fallbackReply = generateFallbackResponse(message.trim(), event, dbData, intent);
+      const { cleanReply, action } = parseActionProposal(fallbackReply, message.trim(), event);
+
       return res.status(200).json({
         success: true,
         configured: false,
         isLiveGemini: false,
-        reply: fallbackReply,
+        reply: cleanReply,
+        action: action || null,
         event: event ? { id: event._id, name: event.name } : null,
         intent: intent.type,
       });
@@ -642,11 +959,14 @@ export const handleAiChat = async (req, res) => {
       reply = generateFallbackResponse(message.trim(), event, dbData, intent);
     }
 
+    const { cleanReply, action } = parseActionProposal(reply, message.trim(), event);
+
     return res.status(200).json({
       success: true,
       configured: true,
       isLiveGemini: true,
-      reply,
+      reply: cleanReply,
+      action: action || null,
       event: event ? { id: event._id, name: event.name } : null,
       intent: intent.type,
     });
@@ -656,11 +976,14 @@ export const handleAiChat = async (req, res) => {
       const intent = detectQueryIntent(req.body?.message);
       const event = intent.type !== 'general' ? await fetchEvent(req.body?.eventId) : null;
       const fallbackReply = generateFallbackResponse(req.body?.message || '', event, {}, intent);
+      const { cleanReply, action } = parseActionProposal(fallbackReply, req.body?.message || '', event);
+
       return res.status(200).json({
         success: true,
         configured: false,
         isLiveGemini: false,
-        reply: fallbackReply,
+        reply: cleanReply,
+        action: action || null,
         event: event ? { id: event._id, name: event.name } : null,
         intent: intent.type,
       });

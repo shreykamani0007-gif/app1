@@ -18,6 +18,7 @@ import {
 import { Card } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
+import ActionConfirmationCard from '../components/ai/ActionConfirmationCard';
 import { useEventContext } from '../context/EventContext';
 import { sendAiMessage, getAiStatus } from '../services/api';
 
@@ -209,24 +210,24 @@ export default function AiAssistant() {
 
   const samplePrompts = [
     {
+      title: 'Create Task: Arrange Auditorium',
+      prompt: 'Create a task to arrange the auditorium by October 20.',
+      desc: 'Propose new task with deadline for active event',
+    },
+    {
+      title: 'Schedule Meeting',
+      prompt: 'Schedule a logistics meeting tomorrow at 5 PM.',
+      desc: 'Plan ops sync with agenda and room setup',
+    },
+    {
+      title: 'Log Potential Risk',
+      prompt: 'Create a risk for possible auditorium delay.',
+      desc: 'Record severity, probability & mitigation',
+    },
+    {
       title: 'Draft Volunteer Announcement',
-      prompt: 'Draft an announcement for volunteers.',
-      desc: 'Generate shift notice with event roster',
-    },
-    {
-      title: 'Show Overdue Tasks',
-      prompt: 'Show my overdue tasks.',
-      desc: 'Review upcoming and pending deadlines',
-    },
-    {
-      title: 'Summarize Active Event',
-      prompt: 'Summarize the current event.',
-      desc: 'Quick breakdown of tasks, roster & schedule',
-    },
-    {
-      title: 'Explain Recursion',
-      prompt: 'Explain recursion in simple words.',
-      desc: 'Clear technical explanation with examples',
+      prompt: 'Draft an announcement reminding volunteers to arrive early.',
+      desc: 'Prepare safety draft notice before broadcasting',
     },
   ];
 
@@ -264,6 +265,7 @@ export default function AiAssistant() {
           id: `ai-${Date.now()}`,
           role: 'assistant',
           content: res.reply,
+          action: res.action || null,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
         setMessages((prev) => [...prev, assistantMessage]);
@@ -380,7 +382,45 @@ export default function AiAssistant() {
                     }`}
                   >
                     {isAi ? (
-                      <MarkdownRenderer content={msg.content} />
+                      <>
+                        <MarkdownRenderer content={msg.content} />
+                        {msg.action && (
+                          <ActionConfirmationCard
+                            action={msg.action}
+                            onActionComplete={(actId, res) => {
+                              setMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === msg.id
+                                    ? {
+                                        ...m,
+                                        action: {
+                                          ...m.action,
+                                          status: 'confirmed',
+                                          result: res.data,
+                                        },
+                                      }
+                                    : m
+                                )
+                              );
+                            }}
+                            onActionCancel={() => {
+                              setMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === msg.id
+                                    ? {
+                                        ...m,
+                                        action: {
+                                          ...m.action,
+                                          status: 'cancelled',
+                                        },
+                                      }
+                                    : m
+                                )
+                              );
+                            }}
+                          />
+                        )}
+                      </>
                     ) : (
                       <div className="text-xs sm:text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</div>
                     )}
