@@ -6,7 +6,6 @@ import {
   ListTodo,
   Users,
   AlertTriangle,
-  Sparkles,
   ArrowUpRight,
   TrendingUp,
   MapPin,
@@ -22,6 +21,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../co
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
+import EventSelector from '../components/dashboard/EventSelector';
 import { getEvents, createEvent } from '../services/api';
 
 export default function Dashboard() {
@@ -208,7 +208,7 @@ export default function Dashboard() {
       time: '1 hour ago',
     },
     {
-      actor: 'ClubOps AI',
+      actor: 'System Monitor',
       action: 'flagged risk update on',
       target: 'Block C Network Bandwidth',
       time: '3 hours ago',
@@ -218,24 +218,6 @@ export default function Dashboard() {
       action: 'uploaded asset',
       target: 'InnovateX_Banner_Final_v2.pdf',
       time: '5 hours ago',
-    },
-  ];
-
-  const aiInsights = [
-    {
-      type: 'Urgent Bottleneck',
-      text: 'Auditorium booking invoice has been pending approval for 4 days. Contact Faculty Advisor to avoid cancellation.',
-      tag: 'Critical Action',
-    },
-    {
-      type: 'Volunteer Shift Optimization',
-      text: 'Sunday morning session (8:00 AM - 11:00 AM) is understaffed by 6 volunteers for breakfast logistics.',
-      tag: 'Staffing Alert',
-    },
-    {
-      type: 'Budget Tracking',
-      text: 'Merchandise quote came in 8% below estimated budget. Projected savings: $420.',
-      tag: 'Cost Efficiency',
     },
   ];
 
@@ -269,7 +251,7 @@ export default function Dashboard() {
       {/* Top Page Header */}
       <PageHeader
         title="Event Operations Command"
-        description="Real-time status, volunteer coordination, and AI-driven insights for college club operations."
+        description="Real-time status, volunteer coordination, and operational milestones for college club management."
         badge={<StatusBadge status="active" label="Live Preparation" />}
         actions={
           <div className="flex items-center gap-2">
@@ -281,8 +263,8 @@ export default function Dashboard() {
             >
               Add Event
             </Button>
-            <Button variant="primary" size="sm" icon={Sparkles}>
-              AI Event Audit
+            <Button variant="primary" size="sm" icon={ArrowUpRight}>
+              Export Report
             </Button>
           </div>
         }
@@ -359,28 +341,22 @@ export default function Dashboard() {
         </div>
       ) : (
         /* Populated Event Overview Banner */
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-brand-950 text-white p-6 sm:p-8 shadow-xl border border-slate-800">
-          <div className="absolute right-0 top-0 -mt-8 -mr-8 w-64 h-64 bg-brand-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-brand-950 text-white p-6 sm:p-8 shadow-xl border border-slate-800">
+          {/* Contained background blur blob so popover dropdown is not clipped */}
+          <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
+            <div className="absolute right-0 top-0 -mt-8 -mr-8 w-64 h-64 bg-brand-500/20 rounded-full blur-3xl" />
+          </div>
 
-          {/* Event Selector Pill if multiple events exist */}
-          {events.length > 1 && (
-            <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
-              <span className="text-xs text-slate-400 font-medium shrink-0">Switch Event:</span>
-              {events.map((ev, idx) => (
-                <button
-                  key={ev._id || idx}
-                  onClick={() => setSelectedEventIndex(idx)}
-                  className={`text-xs px-3 py-1 rounded-full border transition-all ${
-                    selectedEventIndex === idx
-                      ? 'bg-white text-slate-950 font-bold border-white shadow-sm'
-                      : 'bg-white/10 text-slate-300 border-white/15 hover:bg-white/20'
-                  }`}
-                >
-                  {ev.name}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Clean, Scalable Event Selector */}
+          <div className="relative z-30 mb-5">
+            <EventSelector
+              events={events}
+              selectedEventIndex={selectedEventIndex}
+              onSelectEvent={(idx) => setSelectedEventIndex(idx)}
+              onAddEvent={() => setIsModalOpen(true)}
+              formatDate={formatEventDate}
+            />
+          </div>
 
           <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div>
@@ -463,45 +439,8 @@ export default function Dashboard() {
         })}
       </div>
 
-      {/* 3. AI Insights Widget & Upcoming Deadlines (2-column layout) */}
+      {/* 3. Operational Checkpoints: Deadlines & Risks (Side-by-Side) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* AI Insights Card (5 cols) */}
-        <div className="lg:col-span-5">
-          <Card className="h-full border-brand-200/80 bg-gradient-to-b from-indigo-50/40 via-white to-white">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center shadow-sm">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <CardTitle className="text-sm font-bold text-slate-900">AI Operations Copilot</CardTitle>
-                  <CardDescription>Live automated risk & workflow recommendations</CardDescription>
-                </div>
-              </div>
-              <StatusBadge status="confirmed" label="Active" />
-            </CardHeader>
-            <CardContent className="space-y-3.5">
-              {aiInsights.map((insight, idx) => (
-                <div
-                  key={idx}
-                  className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs hover:border-brand-300 transition-all"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-brand-600" />
-                      {insight.type}
-                    </span>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-brand-50 text-brand-700">
-                      {insight.tag}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-600 leading-relaxed">{insight.text}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Upcoming Deadlines (7 cols) */}
         <div className="lg:col-span-7">
           <Card className="h-full">
@@ -538,17 +477,14 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
-      </div>
 
-      {/* 4. Open Risks & Recent Activity (2-column layout) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Open Risks (7 cols) */}
-        <div className="lg:col-span-7">
-          <Card>
+        {/* Open Risks & Contingencies (5 cols) */}
+        <div className="lg:col-span-5">
+          <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-bold text-slate-900">Open Risks & Contingencies</CardTitle>
-                <CardDescription>Active issues requiring proactive mitigation before event day</CardDescription>
+                <CardDescription>Issues requiring proactive mitigation before event day</CardDescription>
               </div>
               <StatusBadge status="urgent" label="3 Open" />
             </CardHeader>
@@ -560,7 +496,7 @@ export default function Dashboard() {
                       <h4 className="text-xs font-bold text-slate-800">{risk.title}</h4>
                       <StatusBadge status={risk.severity} />
                     </div>
-                    <p className="text-xs text-slate-600">{risk.impact}</p>
+                    <p className="text-xs text-slate-600 leading-relaxed">{risk.impact}</p>
                     <div className="mt-2 text-[11px] text-slate-400">
                       Assigned owner: <span className="font-semibold text-slate-600">{risk.owner}</span>
                     </div>
@@ -570,14 +506,17 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+      </div>
 
-        {/* Recent Activity (5 cols) */}
-        <div className="lg:col-span-5">
-          <Card>
+      {/* 4. Live Activity & Operations Health Overview (2-column layout) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Recent Activity (7 cols) */}
+        <div className="lg:col-span-7">
+          <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-bold text-slate-900">Recent Activity</CardTitle>
-                <CardDescription>Live log from team members and automation</CardDescription>
+                <CardDescription>Live log from team members and operational updates</CardDescription>
               </div>
               <Activity className="w-4 h-4 text-slate-400" />
             </CardHeader>
@@ -595,6 +534,62 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Operations Health & Resource Status (5 cols) */}
+        <div className="lg:col-span-5">
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold text-slate-900">Operations Health</CardTitle>
+                <CardDescription>Resource deployment and milestone tracking</CardDescription>
+              </div>
+              <StatusBadge status="active" label="Healthy" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Task Progress Stat */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Milestone Completion
+                  </span>
+                  <span className="font-bold text-slate-900">65.4%</span>
+                </div>
+                <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: '65.4%' }} />
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1.5">34 of 52 milestones verified</p>
+              </div>
+
+              {/* Volunteer Shift Stat */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-blue-600" />
+                    Volunteer Staffing
+                  </span>
+                  <span className="font-bold text-slate-900">42 / 78 On Duty</span>
+                </div>
+                <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 rounded-full" style={{ width: '53.8%' }} />
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1.5">53.8% shift coverage active</p>
+              </div>
+
+              {/* Risk Mitigation Stat */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                    Critical Risk Status
+                  </span>
+                  <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">1 Dean Signoff</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">2 other risks monitored by logistics & tech leads</p>
+              </div>
             </CardContent>
           </Card>
         </div>
