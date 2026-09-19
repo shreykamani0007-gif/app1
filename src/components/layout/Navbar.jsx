@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { Menu, Bell, Search, Plus, Sparkles, Calendar } from 'lucide-react';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
+import { useEventContext } from '../../context/EventContext';
 
 export default function Navbar({ onOpenSidebar }) {
   const [showQuickModal, setShowQuickModal] = useState(false);
+  const { selectedEvent } = useEventContext();
 
   return (
     <>
@@ -22,7 +24,7 @@ export default function Navbar({ onOpenSidebar }) {
           <div className="hidden sm:flex items-center gap-2 text-xs font-medium text-slate-500">
             <span className="px-2 py-1 bg-slate-100 rounded-md text-slate-700 font-semibold flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-brand-600" />
-              InnovateX 2026
+              {selectedEvent ? selectedEvent.name : 'InnovateX 2026'}
             </span>
             <span>/</span>
             <span className="text-slate-900 font-semibold">Operations Command</span>

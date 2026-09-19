@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 import eventRoutes from './routes/eventRoutes.js';
+import taskRoutes from './routes/taskRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
 
 // Load environment variables
@@ -40,8 +41,9 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Event API routes
+// Event and Task API routes
 app.use('/api/events', eventRoutes);
+app.use('/api/tasks', taskRoutes);
 
 // 404 handler for undefined routes
 app.use((req, res) => {

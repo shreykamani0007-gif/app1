@@ -22,12 +22,22 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import EventSelector from '../components/dashboard/EventSelector';
-import { getEvents, createEvent } from '../services/api';
+import EventSwitcher from '../components/ui/EventSwitcher';
+import { useEventContext } from '../context/EventContext';
+import { getEvents, createEvent, getTasksByEvent } from '../services/api';
 
 export default function Dashboard() {
-  const [events, setEvents] = useState([]);
+  const {
+    events: contextEvents,
+    selectedEventId,
+    setSelectedEventId,
+    refreshEvents: refreshContextEvents,
+  } = useEventContext();
+
+  const [events, setEvents] = useState(contextEvents || []);
   const [selectedEventIndex, setSelectedEventIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [eventTasks, setEventTasks] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // Modal for creating a new event
@@ -46,13 +56,18 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
       const res = await getEvents();
-      setEvents(res.data || []);
-      if (res.data && res.data.length > 0) {
-        setSelectedEventIndex(0);
+      if (res && res.data && res.data.length > 0) {
+        setEvents(res.data);
+      } else if (contextEvents && contextEvents.length > 0) {
+        setEvents(contextEvents);
       }
     } catch (err) {
-      console.error('Error fetching events:', err);
-      setError(err.message || 'Failed to connect to backend server');
+      console.warn('Dashboard fetchEvents warning:', err.message);
+      if (contextEvents && contextEvents.length > 0) {
+        setEvents(contextEvents);
+      } else {
+        setError(err.message || 'Failed to connect to backend server');
+      }
     } finally {
       setLoading(false);
     }
@@ -61,6 +76,23 @@ export default function Dashboard() {
   useEffect(() => {
     fetchEvents();
   }, []);
+
+  // Synchronize events with context
+  useEffect(() => {
+    if (contextEvents && contextEvents.length > 0) {
+      setEvents(contextEvents);
+    }
+  }, [contextEvents]);
+
+  // Synchronize selected index when selectedEventId changes
+  useEffect(() => {
+    if (events.length > 0 && selectedEventId) {
+      const idx = events.findIndex((e) => String(e._id || e.id) === String(selectedEventId));
+      if (idx !== -1 && idx !== selectedEventIndex) {
+        setSelectedEventIndex(idx);
+      }
+    }
+  }, [selectedEventId, events]);
 
   const handleCreateEvent = async (e) => {
     e.preventDefault();
@@ -110,20 +142,60 @@ export default function Dashboard() {
     }
   };
 
-  // Mock data for Step 1 UI placeholders
+  const activeEvent = events[selectedEventIndex] || events[0] || null;
+
+  // Fallback map for offline/instant initial state
+  const fallbackTasksMap = {
+    evt_innovatex_2026: [
+      { status: 'In Progress', deadline: 'Tomorrow, 5:00 PM', title: 'Confirm guest speaker travel reimbursement', owner: 'David K.', department: 'Finance' },
+      { status: 'In Progress', deadline: 'Sep 22, 2:00 PM', title: 'Prepare Wi-Fi credentials signage for Block C', owner: 'Tech Team', department: 'Tech Ops' },
+      { status: 'To Do', deadline: 'Sep 27, 4:00 PM', title: 'Finalize lunch coupons with university dining hall', owner: 'Alex C.', department: 'Logistics' },
+      { status: 'Completed', deadline: 'Completed', title: 'Collect participant waiver forms digitally', owner: 'Priya R.', department: 'Registration' },
+    ],
+    evt_techfest_2026: [
+      { status: 'In Progress', deadline: 'Oct 5, 10:00 AM', title: 'Arrange venue and auditorium soundcheck', owner: 'Marcus L.', department: 'Logistics' },
+      { status: 'To Do', deadline: 'Oct 8, 6:00 PM', title: 'Contact sponsors for title sponsorship deck', owner: 'Sophia W.', department: 'Sponsorship' },
+      { status: 'Completed', deadline: 'Oct 1, 12:00 PM', title: 'Prepare posters and social media banners', owner: 'Design Club', department: 'Marketing' },
+    ],
+  };
+
+  // Fetch tasks belonging strictly to the currently selected active event
+  useEffect(() => {
+    if (activeEvent) {
+      const eId = activeEvent._id || activeEvent.id;
+      getTasksByEvent(eId)
+        .then((res) => {
+          if (res && res.success && Array.isArray(res.data)) {
+            setEventTasks(res.data);
+          } else {
+            setEventTasks(fallbackTasksMap[eId] || []);
+          }
+        })
+        .catch(() => {
+          setEventTasks(fallbackTasksMap[eId] || []);
+        });
+    }
+  }, [activeEvent]);
+
+  // Dynamic statistics per event
+  const totalTasksCount = eventTasks.length;
+  const completedTasksCount = eventTasks.filter((t) => t.status === 'Completed').length;
+  const inProgressTasksCount = eventTasks.filter((t) => t.status === 'In Progress').length;
+  const completionRate = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
+
   const metrics = [
     {
       title: 'Total Tasks',
-      value: '52',
-      subtext: '+8 added this week',
+      value: String(totalTasksCount),
+      subtext: `${inProgressTasksCount} in progress`,
       icon: ListTodo,
       color: 'text-indigo-600',
       bg: 'bg-indigo-50',
     },
     {
       title: 'Completed Tasks',
-      value: '34',
-      subtext: '65.4% completion rate',
+      value: String(completedTasksCount),
+      subtext: `${completionRate}% completion rate`,
       icon: CheckCircle2,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50',
@@ -146,32 +218,24 @@ export default function Dashboard() {
     },
   ];
 
-  const upcomingDeadlines = [
-    {
-      title: 'Sponsorship Agreement Finalization',
-      lead: 'Finance Lead (David K.)',
-      due: 'Tomorrow, 5:00 PM',
-      status: 'urgent',
-    },
-    {
-      title: 'Auditorium AV & Lighting Walkthrough',
-      lead: 'Logistics Lead (Sarah M.)',
-      due: 'Sep 22, 2:00 PM',
-      status: 'in_progress',
-    },
-    {
-      title: 'Attendee Badge & Lanyard Printing',
-      lead: 'Design Lead (Priya R.)',
-      due: 'Sep 25, 11:59 PM',
-      status: 'todo',
-    },
-    {
-      title: 'Food Catering Headcount Sign-off',
-      lead: 'Operations (Alex C.)',
-      due: 'Sep 27, 4:00 PM',
-      status: 'todo',
-    },
-  ];
+  const upcomingDeadlines = eventTasks.filter((t) => t.status !== 'Completed' && t.deadline).length > 0
+    ? eventTasks
+        .filter((t) => t.status !== 'Completed' && t.deadline)
+        .slice(0, 4)
+        .map((t) => ({
+          title: t.title,
+          lead: `${t.department || 'Lead'} (${t.owner || 'Assigned'})`,
+          due: t.deadline,
+          status: t.status === 'To Do' ? 'todo' : 'in_progress',
+        }))
+    : [
+        {
+          title: 'No pending deadlines for this event',
+          lead: 'All milestones verified',
+          due: 'Up to date',
+          status: 'completed',
+        },
+      ];
 
   const openRisks = [
     {
@@ -220,8 +284,6 @@ export default function Dashboard() {
       time: '5 hours ago',
     },
   ];
-
-  const activeEvent = events[selectedEventIndex] || null;
 
   // Format date helper
   const formatEventDate = (dateString) => {
@@ -352,7 +414,11 @@ export default function Dashboard() {
             <EventSelector
               events={events}
               selectedEventIndex={selectedEventIndex}
-              onSelectEvent={(idx) => setSelectedEventIndex(idx)}
+              onSelectEvent={(idx) => {
+                setSelectedEventIndex(idx);
+                const evt = events[idx];
+                if (evt) setSelectedEventId(evt._id || evt.id);
+              }}
               onAddEvent={() => setIsModalOpen(true)}
               formatDate={formatEventDate}
             />
@@ -388,14 +454,16 @@ export default function Dashboard() {
                   {calculateDaysLeft(activeEvent.date) || '18 Days'}
                 </div>
                 <div className="text-[11px] text-brand-200">
-                  Date: {formatEventDate(activeEvent.date)}
+                  Scheduled: {formatEventDate(activeEvent.date)}
                 </div>
               </div>
               <div className="h-10 w-px bg-white/20" />
               <div>
                 <div className="text-xs text-slate-300 uppercase tracking-wider font-semibold">Readiness</div>
-                <div className="text-2xl font-black text-emerald-400">68%</div>
-                <div className="text-[11px] text-emerald-200">On Target</div>
+                <div className="text-2xl font-black text-emerald-400">{completionRate}%</div>
+                <div className="text-[11px] text-emerald-200">
+                  {completionRate > 50 ? 'On Target' : 'In Progress'}
+                </div>
               </div>
             </div>
           </div>
@@ -404,10 +472,15 @@ export default function Dashboard() {
           <div className="mt-6 pt-4 border-t border-white/10">
             <div className="flex items-center justify-between text-xs text-slate-300 mb-1.5">
               <span>Overall Operations Progress</span>
-              <span className="font-semibold text-white">34 of 52 milestones verified</span>
+              <span className="font-semibold text-white">
+                {completedTasksCount} of {totalTasksCount} milestones verified
+              </span>
             </div>
             <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-brand-500 to-emerald-400 rounded-full" style={{ width: '68%' }} />
+              <div
+                className="h-full bg-gradient-to-r from-brand-500 to-emerald-400 rounded-full transition-all duration-500"
+                style={{ width: `${completionRate}%` }}
+              />
             </div>
           </div>
         </div>

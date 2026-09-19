@@ -77,3 +77,40 @@ export async function deleteEvent(id) {
     method: 'DELETE',
   });
 }
+
+/**
+ * Get all tasks belonging to an event
+ */
+export async function getTasksByEvent(eventId) {
+  return request(`/events/${eventId}/tasks`);
+}
+
+/**
+ * Create a new task belonging to an event
+ */
+export async function createTask(eventId, taskData) {
+  return request(`/events/${eventId}/tasks`, {
+    method: 'POST',
+    body: JSON.stringify(taskData),
+  });
+}
+
+/**
+ * Update a task by ID
+ */
+export async function updateTask(taskId, taskData) {
+  return request(`/tasks/${taskId}`, {
+    method: 'PUT',
+    body: JSON.stringify(taskData),
+  });
+}
+
+/**
+ * Delete a task by ID
+ */
+export async function deleteTask(taskId) {
+  return request(`/tasks/${taskId}`, {
+    method: 'DELETE',
+  });
+}
+

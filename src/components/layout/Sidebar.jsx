@@ -14,6 +14,7 @@ import {
   X,
   ChevronRight
 } from 'lucide-react';
+import { useEventContext } from '../../context/EventContext';
 
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -27,6 +28,8 @@ const navItems = [
 ];
 
 export default function Sidebar({ isOpen, onClose }) {
+  const { selectedEvent } = useEventContext();
+
   return (
     <>
       {/* Mobile Backdrop */}
@@ -72,7 +75,9 @@ export default function Sidebar({ isOpen, onClose }) {
           <div className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-800 flex items-center justify-between text-xs">
             <div className="truncate">
               <span className="block text-[10px] text-slate-400 uppercase font-semibold">Active Event</span>
-              <span className="font-semibold text-slate-200 truncate">InnovateX Fest 2026</span>
+              <span className="font-semibold text-slate-200 truncate">
+                {selectedEvent ? selectedEvent.name : 'InnovateX Fest 2026'}
+              </span>
             </div>
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0 ml-2" />
           </div>

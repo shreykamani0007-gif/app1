@@ -6,8 +6,12 @@ import {
   updateEvent,
   deleteEvent,
 } from '../controllers/eventController.js';
+import taskRoutes from './taskRoutes.js';
 
 const router = express.Router();
+
+// Re-route into task router
+router.use('/:eventId/tasks', taskRoutes);
 
 router.route('/')
   .get(getEvents)

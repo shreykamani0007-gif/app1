@@ -2,7 +2,26 @@ import mongoose from 'mongoose';
 import Event from '../models/Event.js';
 
 // In-memory fallback store when MongoDB is not actively connected
-let inMemoryEvents = [];
+let inMemoryEvents = [
+  {
+    _id: 'evt_innovatex_2026',
+    name: 'InnovateX Fest 2026',
+    description: '36-hour national collegiate hackathon, keynote speaker tracks, and tech club project exhibitions.',
+    date: '2026-10-12T09:00:00.000Z',
+    location: 'University Student Center & Main Audi',
+    status: 'Ongoing',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    _id: 'evt_techfest_2026',
+    name: 'TechFest 2026',
+    description: 'Annual inter-college robotics championship, paper presentations, and coding league.',
+    date: '2026-11-05T10:00:00.000Z',
+    location: 'Campus Engineering Block & Quad',
+    status: 'Planning',
+    createdAt: new Date().toISOString(),
+  },
+];
 
 // @desc    Get all events
 // @route   GET /api/events
