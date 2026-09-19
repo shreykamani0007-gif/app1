@@ -19,8 +19,18 @@ import { Card } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import ActionConfirmationCard from '../components/ai/ActionConfirmationCard';
+import EventPlanCard from '../components/ai/EventPlanCard';
 import { useEventContext } from '../context/EventContext';
-import { sendAiMessage, getAiStatus } from '../services/api';
+import {
+  sendAiMessage,
+  getAiStatus,
+  createEvent,
+  createTask,
+  createRisk,
+  createVolunteer,
+  getVolunteersByEvent,
+} from '../services/api';
+import { defaultVolunteersByEvent } from '../data/volunteersData';
 
 /**
  * Structured text renderer for AI responses supporting:
@@ -166,13 +176,239 @@ function renderInline(text) {
   });
 }
 
+/**
+ * Generate a complete, adaptive event plan based on user responses and available real volunteers
+ */
+function generateEventPlan(details, availableVolunteers = []) {
+  const { name, description = '', date, venue } = details;
+  const descLower = description.toLowerCase();
+
+  // Extract volunteer names from real system volunteers or fallback to defaults
+  let volunteerPool = availableVolunteers.map((v) => v.name).filter(Boolean);
+  if (volunteerPool.length === 0) {
+    const allDefs = Object.values(defaultVolunteersByEvent || {}).flat();
+    volunteerPool = [...new Set(allDefs.map((v) => v.name))];
+  }
+  if (volunteerPool.length === 0) {
+    volunteerPool = ['Maya Patel', 'Kavita Rao', 'Rohan Sharma', 'Liam Murphy', 'Sarah Jenkins', 'David Kim'];
+  }
+
+  const getVol = (idx) => volunteerPool[idx % volunteerPool.length];
+
+  // 1. Adaptive Schedule based on event description
+  let schedule = [];
+  if (descLower.includes('hackathon') || descLower.includes('code') || descLower.includes('dev') || descLower.includes('programming')) {
+    schedule = [
+      { time: '08:30 AM - 09:30 AM', activity: 'Registration, Breakfast & Team Formation' },
+      { time: '09:30 AM - 10:30 AM', activity: 'Opening Ceremony & Problem Statement Reveal' },
+      { time: '10:30 AM - 01:00 PM', activity: 'Hacking Sprint 1 & Mentor Walkthroughs' },
+      { time: '01:00 PM - 02:00 PM', activity: 'Lunch & Sponsor Booth Networking' },
+      { time: '02:00 PM - 05:00 PM', activity: 'Hacking Sprint 2 & Technical Checkpoints' },
+      { time: '05:00 PM - 06:30 PM', activity: 'Project Submissions & Live Demos' },
+      { time: '06:30 PM - 07:30 PM', activity: 'Judging Deliberation & Award Ceremony' },
+    ];
+  } else if (descLower.includes('workshop') || descLower.includes('seminar') || descLower.includes('talk') || descLower.includes('training')) {
+    schedule = [
+      { time: '09:00 AM - 09:45 AM', activity: 'Registration & Welcome Coffee' },
+      { time: '09:45 AM - 10:15 AM', activity: 'Opening Keynote & Topic Overview' },
+      { time: '10:15 AM - 11:45 AM', activity: 'Interactive Workshop Session 1' },
+      { time: '11:45 AM - 12:00 PM', activity: 'Mid-Morning Networking Break' },
+      { time: '12:00 PM - 01:15 PM', activity: 'Hands-on Practice & Group Case Study' },
+      { time: '01:15 PM - 02:15 PM', activity: 'Lunch & Peer Discussions' },
+      { time: '02:15 PM - 03:45 PM', activity: 'Advanced Deep Dive & Q&A Panel' },
+      { time: '03:45 PM - 04:15 PM', activity: 'Closing Remarks & Resource Distribution' },
+    ];
+  } else if (descLower.includes('conference') || descLower.includes('summit') || descLower.includes('symposium')) {
+    schedule = [
+      { time: '08:30 AM - 09:30 AM', activity: 'Badge Collection & Light Breakfast' },
+      { time: '09:30 AM - 10:30 AM', activity: 'Presidential Address & Keynote Speaker' },
+      { time: '10:45 AM - 12:30 PM', activity: 'Track Sessions (Technical & Leadership)' },
+      { time: '12:30 PM - 01:30 PM', activity: 'Executive Networking Lunch' },
+      { time: '01:30 PM - 03:30 PM', activity: 'Panel Discussion & Lightning Talks' },
+      { time: '03:45 PM - 05:00 PM', activity: 'Closing Keynote & Next Year Preview' },
+    ];
+  } else {
+    // General / cultural / sports / club event
+    schedule = [
+      { time: '09:00 AM - 10:00 AM', activity: 'Venue Setup & Participant Registration' },
+      { time: '10:00 AM - 10:30 AM', activity: 'Welcome Address & Opening Ceremony' },
+      { time: '10:30 AM - 01:00 PM', activity: 'Main Stage Events & Competitions' },
+      { time: '01:00 PM - 02:00 PM', activity: 'Lunch Break & Community Booths' },
+      { time: '02:00 PM - 04:30 PM', activity: 'Afternoon Showcase & Activities' },
+      { time: '04:30 PM - 05:30 PM', activity: 'Award Distribution & Closing Remarks' },
+    ];
+  }
+
+  // 2. Tasks
+  const tasks = [
+    {
+      title: 'Confirm Venue Booking & AV Checklist',
+      owner: 'Logistics Team',
+      priority: 'High',
+      deadline: '7 days before event',
+    },
+    {
+      title: 'Finalize Volunteer Roster & Briefing',
+      owner: 'Volunteer Coordinator',
+      priority: 'High',
+      deadline: '4 days before event',
+    },
+    {
+      title: 'Print Participant Badges & Welcome Kits',
+      owner: 'Branding Team',
+      priority: 'Medium',
+      deadline: '2 days before event',
+    },
+    {
+      title: 'Coordinate Catering & Refreshment Delivery',
+      owner: 'Hospitality Lead',
+      priority: 'Medium',
+      deadline: '1 day before event',
+    },
+    {
+      title: 'Sound Check & Live Rehearsal',
+      owner: 'Tech Lead',
+      priority: 'High',
+      deadline: 'Event Day 07:30 AM',
+    },
+    {
+      title: 'Post-Event Feedback & Survey Distribution',
+      owner: 'Operations Team',
+      priority: 'Low',
+      deadline: '1 day after event',
+    },
+  ];
+
+  // 3. Volunteer Assignments (Task -> Volunteer -> Responsibility -> Time)
+  const volunteerAssignments = [
+    {
+      task: 'Registration Desk',
+      volunteer: getVol(0),
+      responsibility: 'Scan QR tickets, distribute badges & welcome kits',
+      time: '08:30 AM - 11:00 AM',
+    },
+    {
+      task: 'A/V & Stage Operations',
+      volunteer: getVol(1),
+      responsibility: 'Manage microphones, stage projector & slide decks',
+      time: '09:00 AM - 05:30 PM',
+    },
+    {
+      task: 'Hospitality & Catering',
+      volunteer: getVol(2),
+      responsibility: 'Coordinate lunch service, water stations & snacks',
+      time: '11:30 AM - 02:30 PM',
+    },
+    {
+      task: 'Crowd Flow & Help Desk',
+      volunteer: getVol(3),
+      responsibility: 'Direct attendee movements and manage inquiries',
+      time: '08:30 AM - 05:00 PM',
+    },
+    {
+      task: 'Safety & Emergency Support',
+      volunteer: getVol(4),
+      responsibility: 'Emergency exit oversight and first aid point of contact',
+      time: 'All Day',
+    },
+  ];
+
+  // 4. Deadlines
+  const deadlines = [
+    { milestone: '2 Weeks Before', action: 'Finalize speakers, budget approval, and equipment rental' },
+    { milestone: '1 Week Before', action: 'Close participant registration & send arrival guidelines' },
+    { milestone: '3 Days Before', action: 'Finalize catering headcount & print participant badges' },
+    { milestone: '1 Day Before', action: 'Venue dry run, AV test, and volunteer briefing' },
+    { milestone: 'Event Day (07:30 AM)', action: 'Core team arrival & registration desk setup' },
+  ];
+
+  // 5. Potential Risks & Suggested Actions
+  const risks = [
+    {
+      title: 'A/V & Equipment Glitches During Presentations',
+      severity: 'high',
+      reason: 'Microphone feedback, HDMI compatibility, or projector display delays can interrupt the event.',
+      suggestedAction: 'Keep backup HDMI adapters, offline presentation copies, and test equipment 45 minutes prior.',
+    },
+    {
+      title: 'Registration Desk Bottleneck at Peak Arrival',
+      severity: 'medium',
+      reason: 'Crowd arrivals concentrated within 30 minutes can create queues extending outside the venue.',
+      suggestedAction: 'Split check-in into alphabetical lines (A-M, N-Z) and deploy 2 additional volunteers.',
+    },
+    {
+      title: 'Catering & Dietary Availability Constraints',
+      severity: 'low',
+      reason: 'Unregistered walk-in guests or uncommunicated dietary preferences can cause shortages.',
+      suggestedAction: 'Order 10-15% surplus refreshments and clearly label vegetarian and vegan options.',
+    },
+  ];
+
+  return {
+    eventDetails: {
+      name,
+      description,
+      date,
+      venue,
+      location: venue,
+    },
+    schedule,
+    tasks,
+    volunteerAssignments,
+    deadlines,
+    risks,
+  };
+}
+
+/**
+ * Format markdown summary for event plan in chat bubble
+ */
+function formatPlanMarkdown(plan) {
+  const { eventDetails, schedule, tasks, volunteerAssignments, deadlines, risks } = plan;
+
+  return `### 📅 Event Plan Generated: ${eventDetails.name}
+
+Here is the complete event schedule and operational blueprint tailored for **${eventDetails.name}**:
+
+#### 1. Event Details
+- **Event Name:** ${eventDetails.name}
+- **Description:** ${eventDetails.description}
+- **Date:** ${eventDetails.date}
+- **Venue:** ${eventDetails.venue}
+
+#### 2. Event Schedule
+${schedule.map((s) => `- **${s.time}:** ${s.activity}`).join('\n')}
+
+#### 3. Recommended Tasks
+${tasks.map((t, idx) => `${idx + 1}. **${t.title}** — *Owner:* ${t.owner} | *Priority:* ${t.priority} | *Deadline:* ${t.deadline}`).join('\n')}
+
+#### 4. Volunteer Assignments (Real System Volunteers)
+${volunteerAssignments.map((va) => `- **${va.task}** → **${va.volunteer}** → *${va.responsibility}* (${va.time})`).join('\n')}
+
+#### 5. Key Milestones & Deadlines
+${deadlines.map((d) => `- **${d.milestone}:** ${d.action}`).join('\n')}
+
+#### 6. Potential Risks & Suggested Actions
+${risks.map((r) => `- ⚠️ **${r.title}** (${r.severity.toUpperCase()})\n  - *Reason:* ${r.reason}\n  - *Suggested Action:* ${r.suggestedAction}`).join('\n')}
+
+---
+**Would you like to add this event and its tasks, volunteers, and risks to your dashboard?**
+Click **[Add to Dashboard]** below to save it, or **[Edit Plan]** to modify details.`;
+}
+
 export default function AiAssistant() {
-  const { selectedEvent, selectedEventId } = useEventContext();
+  const { selectedEvent, selectedEventId, addNewEvent } = useEventContext();
 
   const [inputVal, setInputVal] = useState('');
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
+
+  // Conversational event schedule creation workflow state machine
+  const [scheduleWorkflow, setScheduleWorkflow] = useState({
+    step: 'idle', // 'idle' | 'asking_name' | 'asking_desc' | 'asking_date' | 'asking_venue' | 'plan_ready' | 'editing'
+    data: {},
+  });
 
   // AI Configuration status (queried from backend)
   const [aiConfig, setAiConfig] = useState({
@@ -209,6 +445,11 @@ export default function AiAssistant() {
   }, [messages, loading]);
 
   const samplePrompts = [
+    {
+      title: 'Design Event Schedule',
+      prompt: 'Design an event schedule for my event',
+      desc: 'Step-by-step AI schedule & operations planner',
+    },
     {
       title: 'Create Task: Arrange Auditorium',
       prompt: 'Create a task to arrange the auditorium by October 20.',
@@ -247,8 +488,189 @@ export default function AiAssistant() {
 
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
-    setLoading(true);
 
+    // =========================================================================
+    // STEP 1: Check if this is a trigger for the Event Schedule Creation workflow
+    // =========================================================================
+    const isScheduleTrigger =
+      /\b(design|create|make|plan|build|draft)\s+(an?\s+)?(event\s+)?schedule\b|\b(event\s+schedule\s+creation|schedule\s+for\s+my\s+event|schedule\s+an?\s+event|help\s+me\s+schedule|schedule\s+planner)\b/i.test(
+        query
+      );
+
+    if (scheduleWorkflow.step === 'idle' && isScheduleTrigger) {
+      setScheduleWorkflow({
+        step: 'asking_name',
+        data: {},
+      });
+
+      const assistantMessage = {
+        id: `ai-${Date.now()}`,
+        role: 'assistant',
+        content: "Sure! I'll help you create the event schedule. Let's start with the basics.\n\nWhat is the name of the event?",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      return;
+    }
+
+    // =========================================================================
+    // STEP 2: Conversational Questioning Flow (ONE AT A TIME)
+    // =========================================================================
+    if (scheduleWorkflow.step === 'asking_name') {
+      setScheduleWorkflow((prev) => ({
+        step: 'asking_desc',
+        data: { ...prev.data, name: query },
+      }));
+
+      const assistantMessage = {
+        id: `ai-${Date.now()}`,
+        role: 'assistant',
+        content: "Briefly describe the event.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      return;
+    }
+
+    if (scheduleWorkflow.step === 'asking_desc') {
+      setScheduleWorkflow((prev) => ({
+        step: 'asking_date',
+        data: { ...prev.data, description: query },
+      }));
+
+      const assistantMessage = {
+        id: `ai-${Date.now()}`,
+        role: 'assistant',
+        content: "What is the event date?",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      return;
+    }
+
+    if (scheduleWorkflow.step === 'asking_date') {
+      setScheduleWorkflow((prev) => ({
+        step: 'asking_venue',
+        data: { ...prev.data, date: query },
+      }));
+
+      const assistantMessage = {
+        id: `ai-${Date.now()}`,
+        role: 'assistant',
+        content: "What is the venue?",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      return;
+    }
+
+    if (scheduleWorkflow.step === 'asking_venue') {
+      setLoading(true);
+      const fullDetails = {
+        ...scheduleWorkflow.data,
+        venue: query,
+      };
+
+      try {
+        // Fetch existing system volunteers to assign real volunteers
+        let existingVolunteers = [];
+        try {
+          const volRes = await getVolunteersByEvent(selectedEventId);
+          if (volRes && volRes.success && Array.isArray(volRes.data) && volRes.data.length > 0) {
+            existingVolunteers = volRes.data;
+          }
+        } catch {}
+
+        const generatedPlan = generateEventPlan(fullDetails, existingVolunteers);
+        const planMarkdown = formatPlanMarkdown(generatedPlan);
+
+        setScheduleWorkflow({
+          step: 'plan_ready',
+          data: {
+            ...fullDetails,
+            plan: generatedPlan,
+          },
+        });
+
+        const assistantMessage = {
+          id: `ai-${Date.now()}`,
+          role: 'assistant',
+          content: planMarkdown,
+          eventPlan: generatedPlan,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      } catch (err) {
+        console.error('[Generate Event Plan Error]:', err);
+        setErrorMessage('Failed to generate event plan. Please try again.');
+      } finally {
+        setLoading(false);
+        setTimeout(() => textareaRef.current?.focus(), 100);
+      }
+      return;
+    }
+
+    if (scheduleWorkflow.step === 'editing') {
+      setLoading(true);
+      try {
+        const currentData = scheduleWorkflow.data;
+        const updatedDetails = { ...currentData };
+
+        // Check if user requested date or venue update
+        const venueMatch = query.match(/venue\s+(?:to\s+|is\s+)?([a-z0-9\s,.-]+?)(?:\s+and|\s+date|\s+time|$)/i);
+        if (venueMatch) updatedDetails.venue = venueMatch[1].trim();
+
+        const dateMatch = query.match(/date\s+(?:to\s+|is\s+)?([a-z0-9\s,.-]+?)(?:\s+and|\s+venue|\s+time|$)/i);
+        if (dateMatch) updatedDetails.date = dateMatch[1].trim();
+
+        if (!venueMatch && !dateMatch) {
+          updatedDetails.description = `${updatedDetails.description || ''} (Modifications: ${query})`;
+        }
+
+        let existingVolunteers = [];
+        try {
+          const volRes = await getVolunteersByEvent(selectedEventId);
+          if (volRes && volRes.success && Array.isArray(volRes.data)) {
+            existingVolunteers = volRes.data;
+          }
+        } catch {}
+
+        const updatedPlan = generateEventPlan(updatedDetails, existingVolunteers);
+        const planMarkdown = formatPlanMarkdown(updatedPlan);
+
+        setScheduleWorkflow({
+          step: 'plan_ready',
+          data: {
+            ...updatedDetails,
+            plan: updatedPlan,
+          },
+        });
+
+        const assistantMessage = {
+          id: `ai-${Date.now()}`,
+          role: 'assistant',
+          content: `I've updated the event plan based on your request:\n\n${planMarkdown}`,
+          eventPlan: updatedPlan,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      } catch (err) {
+        setErrorMessage('Failed to update event plan.');
+      } finally {
+        setLoading(false);
+        setTimeout(() => textareaRef.current?.focus(), 100);
+      }
+      return;
+    }
+
+    // =========================================================================
+    // STEP 3: Normal AI Chat / Event Context Queries (Existing Functionality)
+    // =========================================================================
+    setLoading(true);
     try {
       const historyPayload = updatedMessages
         .filter((m) => m.id !== 'welcome-msg')
@@ -284,6 +706,116 @@ export default function AiAssistant() {
     }
   };
 
+  const handleAddToDashboard = async (plan) => {
+    if (!plan || !plan.eventDetails) {
+      throw new Error('Event plan data is missing.');
+    }
+
+    const { eventDetails, tasks = [], volunteerAssignments = [], risks = [] } = plan;
+
+    // 1. Create the new event in database
+    let validDate = eventDetails.date;
+    const parsedDate = new Date(eventDetails.date);
+    if (isNaN(parsedDate.getTime())) {
+      const d = new Date();
+      d.setDate(d.getDate() + 14);
+      validDate = d.toISOString().split('T')[0];
+    } else {
+      validDate = parsedDate.toISOString().split('T')[0];
+    }
+
+    const newEventPayload = {
+      name: eventDetails.name,
+      description: eventDetails.description,
+      date: validDate,
+      location: eventDetails.venue || eventDetails.location || 'Campus Center',
+      venue: eventDetails.venue || eventDetails.location || 'Campus Center',
+      status: 'Planning',
+    };
+
+    const createdEventRes = await createEvent(newEventPayload);
+    const createdEvent = createdEventRes.data || createdEventRes;
+    const eventId = createdEvent._id || createdEvent.id;
+
+    if (!eventId) {
+      throw new Error('Could not retrieve new event ID from server.');
+    }
+
+    // 2. Automatically populate Tasks
+    for (const t of tasks) {
+      try {
+        await createTask(eventId, {
+          title: t.title,
+          owner: t.owner || 'Core Team',
+          priority: t.priority || 'Medium',
+          deadline: t.deadline || 'TBD',
+          department: 'Operations',
+          status: 'To Do',
+        });
+      } catch (err) {
+        console.warn('Failed to save task:', err.message);
+      }
+    }
+
+    // 3. Automatically populate Volunteers
+    for (const va of volunteerAssignments) {
+      try {
+        await createVolunteer(eventId, {
+          name: va.volunteer,
+          role: va.responsibility,
+          team: va.task,
+          shift: va.time,
+          status: 'confirmed',
+          email: `${va.volunteer.toLowerCase().replace(/[^a-z0-9]/g, '')}@campus.edu`,
+        });
+      } catch (err) {
+        console.warn('Failed to save volunteer:', err.message);
+      }
+    }
+
+    // 4. Automatically populate Risks
+    for (const r of risks) {
+      try {
+        await createRisk(eventId, {
+          title: r.title,
+          category: 'Operations',
+          severity: (r.severity || 'Medium').toLowerCase(),
+          probability: 'medium',
+          impact: 'Moderate',
+          owner: 'Core Team',
+          mitigation: r.suggestedAction || r.reason || '',
+          status: 'open',
+        });
+      } catch (err) {
+        console.warn('Failed to save risk:', err.message);
+      }
+    }
+
+    // 5. Update centralized EventContext so all pages reflect the new event immediately
+    addNewEvent(createdEvent);
+
+    // Reset schedule workflow state back to idle
+    setScheduleWorkflow({ step: 'idle', data: {} });
+
+    return createdEvent;
+  };
+
+  const handleEditPlan = () => {
+    setScheduleWorkflow((prev) => ({
+      ...prev,
+      step: 'editing',
+    }));
+
+    const assistantMessage = {
+      id: `ai-${Date.now()}`,
+      role: 'assistant',
+      content: 'What would you like to modify? (e.g., schedule, tasks, venue, date)',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    setMessages((prev) => [...prev, assistantMessage]);
+    setTimeout(() => textareaRef.current?.focus(), 100);
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -298,6 +830,7 @@ export default function AiAssistant() {
   };
 
   const handleClearChat = () => {
+    setScheduleWorkflow({ step: 'idle', data: {} });
     setMessages([getInitialGreeting()]);
     setErrorMessage(null);
     setInputVal('');
@@ -384,6 +917,13 @@ export default function AiAssistant() {
                     {isAi ? (
                       <>
                         <MarkdownRenderer content={msg.content} />
+                        {msg.eventPlan && (
+                          <EventPlanCard
+                            plan={msg.eventPlan}
+                            onAddToDashboard={handleAddToDashboard}
+                            onEditPlan={handleEditPlan}
+                          />
+                        )}
                         {msg.action && (
                           <ActionConfirmationCard
                             action={msg.action}

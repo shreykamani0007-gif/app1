@@ -87,9 +87,21 @@ export function EventProvider({ children }) {
     }
   };
 
-  useEffect(() => {
+  // Add a newly created event and set it as the active event
+  const addNewEvent = (createdEvent) => {
+    if (!createdEvent) return;
+    const newId = createdEvent._id || createdEvent.id;
+    setEvents((prev) => {
+      const filtered = prev.filter((e) => (e._id || e.id) !== newId);
+      const updated = [createdEvent, ...filtered];
+      try {
+        localStorage.setItem('clubops_events_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    setSelectedEventId(newId);
     refreshEvents();
-  }, []);
+  };
 
   const selectedEvent =
     events.find((e) => String(e._id || e.id) === String(selectedEventId)) || events[0] || defaultEvents[0];
@@ -102,6 +114,7 @@ export function EventProvider({ children }) {
         selectedEventId: selectedEvent ? selectedEvent._id || selectedEvent.id : selectedEventId,
         setSelectedEventId,
         refreshEvents,
+        addNewEvent,
         loading,
       }}
     >

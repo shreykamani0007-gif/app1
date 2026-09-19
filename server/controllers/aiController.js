@@ -110,6 +110,19 @@ async function fetchVolunteers(eventId) {
 export function detectQueryIntent(message) {
   const text = (message || '').toLowerCase().trim();
 
+  // Schedule creation workflow intent
+  const isScheduleCreation = /\b(design|create|make|plan|build|draft)\s+(an?\s+)?(event\s+)?schedule\b|\b(event\s+schedule\s+creation|schedule\s+for\s+my\s+event|schedule\s+an?\s+event|schedule\s+planner)\b/i.test(text);
+  if (isScheduleCreation) {
+    return {
+      type: 'schedule_creation',
+      needsTasks: false,
+      needsMeetings: false,
+      needsRisks: false,
+      needsVolunteers: false,
+      needsEvent: false,
+    };
+  }
+
   // Action intents: create task, assign task, create risk, schedule meeting, draft announcement
   const isCreateTask = /\b(create|add|make|set up|open)\s+(a\s+)?([a-z0-9\s_-]+?\s+)?(task|todo|to-do|action item)\b/i.test(text);
   const isAssignTask = /\b(assign|allocate|give)\s+(the\s+)?([a-z0-9\s_-]+)?\s*(task|todo)\s+to\s+([a-z0-9\s_-]+)/i.test(text) || /\bassign\s+([a-z0-9\s_-]+)\s+to\b/i.test(text);
@@ -460,6 +473,11 @@ function generateFallbackResponse(message, event, data, intent) {
 }
 \`\`\``;
     }
+  }
+
+  // Schedule creation workflow
+  if (intent.type === 'schedule_creation') {
+    return "Sure! I'll help you create the event schedule. Let's start with the basics.\n\nWhat is the name of the event?";
   }
 
   // Greetings
@@ -834,6 +852,18 @@ export const handleAiChat = async (req, res) => {
 
     // 1. Detect question intent to determine required database collections
     const intent = detectQueryIntent(message);
+
+    // If user triggers the schedule creation workflow
+    if (intent.type === 'schedule_creation') {
+      return res.status(200).json({
+        success: true,
+        configured: true,
+        reply: "Sure! I'll help you create the event schedule. Let's start with the basics.\n\nWhat is the name of the event?",
+        action: null,
+        event: null,
+        intent: 'schedule_creation',
+      });
+    }
 
     // 2. Performance rule: Do NOT query unnecessary database collections!
     let event = null;
