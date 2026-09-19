@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { name: 'Tasks', path: '/tasks', icon: CheckSquare },
   { name: 'Volunteers', path: '/volunteers', icon: Users },
   { name: 'Meetings', path: '/meetings', icon: Calendar },
@@ -45,7 +45,7 @@ export default function Sidebar({ isOpen, onClose }) {
       >
         {/* Logo & Brand Header */}
         <div className="h-16 px-6 flex items-center justify-between border-b border-slate-800">
-          <Link to="/" className="flex items-center gap-3 group" onClick={onClose}>
+          <Link to="/dashboard" className="flex items-center gap-3 group" onClick={onClose}>
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-brand-500/25 group-hover:scale-105 transition-transform">
               <Zap className="w-5 h-5 fill-current" />
             </div>
@@ -87,7 +87,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 key={item.path}
                 to={item.path}
                 onClick={onClose}
-                end={item.path === '/'}
+                end={item.path === '/dashboard'}
                 className={({ isActive }) =>
                   `group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                     isActive

@@ -14,23 +14,26 @@ import AiAssistant from './pages/AiAssistant';
 export default function App() {
   return (
     <Routes>
-      {/* Public Login Route */}
+      {/* When user opens root, redirect to /login as starting page */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+
+      {/* Authentication Route */}
       <Route path="/login" element={<Login />} />
 
       {/* Main SaaS App Layout Routes */}
-      <Route path="/" element={<AppLayout />}>
-        <Route index element={<Dashboard />} />
-        <Route path="tasks" element={<Tasks />} />
-        <Route path="volunteers" element={<Volunteers />} />
-        <Route path="meetings" element={<Meetings />} />
-        <Route path="documents" element={<Documents />} />
-        <Route path="risks" element={<Risks />} />
-        <Route path="announcements" element={<Announcements />} />
-        <Route path="ai-assistant" element={<AiAssistant />} />
+      <Route element={<AppLayout />}>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/tasks" element={<Tasks />} />
+        <Route path="/volunteers" element={<Volunteers />} />
+        <Route path="/meetings" element={<Meetings />} />
+        <Route path="/documents" element={<Documents />} />
+        <Route path="/risks" element={<Risks />} />
+        <Route path="/announcements" element={<Announcements />} />
+        <Route path="/ai-assistant" element={<AiAssistant />} />
       </Route>
 
-      {/* Fallback redirect */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* Fallback redirect to /login */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
