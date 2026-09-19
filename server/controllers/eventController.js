@@ -21,6 +21,15 @@ let inMemoryEvents = [
     status: 'Planning',
     createdAt: new Date().toISOString(),
   },
+  {
+    _id: 'evt_aws_workshop_2026',
+    name: 'AWS Cloud & DevOps Workshop',
+    description: 'Hands-on cloud architecture bootcamp with AWS certification prep and live labs.',
+    date: '2026-11-20T14:00:00.000Z',
+    location: 'Computer Lab 3 & Online Stream',
+    status: 'Planning',
+    createdAt: new Date().toISOString(),
+  },
 ];
 
 // @desc    Get all events

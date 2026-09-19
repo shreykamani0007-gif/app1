@@ -18,6 +18,14 @@ const defaultEvents = [
     location: 'Campus Engineering Block & Quad',
     status: 'Planning',
   },
+  {
+    _id: 'evt_aws_workshop_2026',
+    name: 'AWS Cloud & DevOps Workshop',
+    description: 'Hands-on cloud architecture bootcamp with AWS certification prep and live labs.',
+    date: '2026-11-20T14:00:00.000Z',
+    location: 'Computer Lab 3 & Online Stream',
+    status: 'Planning',
+  },
 ];
 
 const EventContext = createContext(null);
@@ -28,7 +36,12 @@ export function EventProvider({ children }) {
       const cached = localStorage.getItem('clubops_events_cache');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const missingDefaults = defaultEvents.filter(
+            (d) => !parsed.some((p) => (p._id || p.id) === d._id)
+          );
+          return [...parsed, ...missingDefaults];
+        }
       }
     } catch {
       // Ignore parse error
