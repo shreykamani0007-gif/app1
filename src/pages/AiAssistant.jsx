@@ -21,6 +21,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import ActionConfirmationCard from '../components/ai/ActionConfirmationCard';
 import EventPlanCard from '../components/ai/EventPlanCard';
 import { useEventContext } from '../context/EventContext';
+import { useAiChat } from '../context/AiChatContext';
 import {
   sendAiMessage,
   getAiStatus,
@@ -398,17 +399,19 @@ Click **[Add to Dashboard]** below to save it, or **[Edit Plan]** to modify deta
 
 export default function AiAssistant() {
   const { selectedEvent, selectedEventId, addNewEvent } = useEventContext();
+  const {
+    messages,
+    setMessages,
+    scheduleWorkflow,
+    setScheduleWorkflow,
+    inputVal,
+    setInputVal,
+    clearChat,
+  } = useAiChat();
 
-  const [inputVal, setInputVal] = useState('');
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
-
-  // Conversational event schedule creation workflow state machine
-  const [scheduleWorkflow, setScheduleWorkflow] = useState({
-    step: 'idle', // 'idle' | 'asking_name' | 'asking_desc' | 'asking_date' | 'asking_venue' | 'plan_ready' | 'editing'
-    data: {},
-  });
 
   // AI Configuration status (queried from backend)
   const [aiConfig, setAiConfig] = useState({
@@ -417,16 +420,6 @@ export default function AiAssistant() {
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
-
-  // Clean, natural initial greeting
-  const getInitialGreeting = () => ({
-    id: 'welcome-msg',
-    role: 'assistant',
-    content: "Hello! How can I help you today? Feel free to ask general questions or anything related to your club's active event.",
-    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-  });
-
-  const [messages, setMessages] = useState(() => [getInitialGreeting()]);
 
   // Query backend AI status on mount
   useEffect(() => {
@@ -830,10 +823,8 @@ export default function AiAssistant() {
   };
 
   const handleClearChat = () => {
-    setScheduleWorkflow({ step: 'idle', data: {} });
-    setMessages([getInitialGreeting()]);
+    clearChat();
     setErrorMessage(null);
-    setInputVal('');
   };
 
   const isStarterState = messages.length <= 1;
