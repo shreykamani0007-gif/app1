@@ -112,20 +112,22 @@ function MarkdownRenderer({ content }) {
 function detectEventIdea(text) {
   const t = (text || '').toLowerCase().trim();
 
-  // Traditional schedule workflow trigger
-  const isScheduleTrigger =
-    /\b(design|create|make|plan|build|draft)\s+(an?\s+)?(event\s+)?schedule\b/.test(t) ||
-    /\b(event\s+schedule\s+creation|schedule\s+for\s+my\s+event|schedule\s+planner)\b/.test(t);
+  // 1. Generic commands without specific event idea details (user just says "plan an event", "create schedule", etc.)
+  const isGenericTrigger =
+    /^(design|create|make|plan|build|draft|start)\s+(an?\s+)?(event|schedule|event\s+schedule|planner|blueprint)\b/i.test(t) ||
+    /^(i\s+want\s+to\s+|help\s+me\s+)?(plan|create|organize|organise|host|conduct|schedule)\s+(an?\s+)?(event|schedule)$/i.test(t) ||
+    /^(event\s+schedule\s+creation|schedule\s+for\s+my\s+event|schedule\s+planner|plan\s+an?\s+event|create\s+an?\s+event|plan\s+event|create\s+event|organize\s+an?\s+event|host\s+an?\s+event|help\s+me\s+plan)$/i.test(t) ||
+    /^(can\s+you\s+)?(help\s+me\s+)?(plan|create|organize)\s+(an?\s+)?event\??$/i.test(t);
 
-  // Broad event idea patterns
-  const isEventIdea =
-    /\b(organize|organise|host|run|conduct|hold|arrange|manage)\b.*\b(event|fest|festival|hackathon|workshop|seminar|competition|tournament|ceremony|conference|exhibition|meetup|webinar|symposium|summit)\b/.test(t) ||
-    /\b(want to|going to|planning to|we are|we want|i am|i want)\b.*\b(organize|host|run|plan|have|conduct|hold)\b.*\b(event|hackathon|fest|workshop|seminar|competition|tournament|conference|festival)\b/.test(t) ||
-    /\b(hackathon|festival|tournament|competition|workshop|seminar|conference|exhibition|cultural\s+fest|tech\s+fest|sports\s+meet|quiz\s+competition)\b.*\b(for|with|about|of|having)\b/.test(t) ||
-    /\bwe\s+are\s+(organizing|hosting|planning|conducting|running|holding)\b/.test(t) ||
-    /\b(2-day|1-day|one-day|two-day|multi-day|weekend)\b.*\b(event|hackathon|fest|tournament|workshop|seminar)\b/.test(t);
+  // 2. Substantive event idea (mentions specific event type, scale, duration, activities, participants, etc.)
+  const isDetailedIdea =
+    /\b(organize|organise|host|run|conduct|hold|arrange|manage)\b.*\b(hackathon|fest|festival|workshop|seminar|competition|tournament|ceremony|conference|exhibition|meetup|webinar|symposium|summit|concert|bootcamp|cultural\s+event|tech\s+event|sports\s+event)\b/i.test(t) ||
+    /\b(want to|going to|planning to|we are|we want|i am|i want)\b.*\b(organize|host|run|plan|have|conduct|hold)\b.*\b(hackathon|fest|workshop|seminar|competition|tournament|conference|festival|webinar|concert|bootcamp)\b/i.test(t) ||
+    /\b(hackathon|festival|tournament|competition|workshop|seminar|conference|exhibition|cultural\s+fest|tech\s+fest|sports\s+meet|quiz\s+competition|webinar)\b.*\b(for|with|about|of|having|featuring|including)\b/i.test(t) ||
+    /\bwe\s+are\s+(organizing|hosting|planning|conducting|running|holding)\b/i.test(t) ||
+    /\b(2-day|1-day|one-day|two-day|multi-day|weekend)\b.*\b(event|hackathon|fest|tournament|workshop|seminar|conference)/i.test(t);
 
-  return { isScheduleTrigger, isEventIdea: isScheduleTrigger || isEventIdea };
+  return { isGenericTrigger, isDetailedIdea, isEventIdea: isGenericTrigger || isDetailedIdea };
 }
 
 // ─── Fallback Plan Generator (when Gemini is offline) ────────────────────────
@@ -403,6 +405,91 @@ export default function AiAssistant() {
     return msg;
   };
 
+  // ─── Process Event Idea (Gemini Analysis + Turn-by-Turn Questions) ──────────
+
+  const processEventIdea = async (ideaText) => {
+    setLoading(true);
+    try {
+      if (geminiAvailable) {
+        // GEMINI FLOW: Analyze the event idea first
+        addAiMessage(
+          `🔍 **Analyzing your event idea...**\n\nLet me understand what you're planning before generating tasks.`
+        );
+
+        let analysis;
+        try {
+          analysis = await analyzeEventIdea(ideaText);
+        } catch (geminiErr) {
+          console.warn('[Gemini Analysis Error]:', geminiErr.message);
+          analysis = {
+            eventType: 'Event',
+            eventScale: 'Medium',
+            duration: '1 day',
+            targetAudience: 'Students',
+            activities: [],
+            operationalAreas: ['Logistics', 'Operations'],
+            requirements: [],
+            risks: [],
+            missingInfo: ['Event date', 'Venue'],
+            summary: ideaText,
+          };
+        }
+
+        // Show analysis card + determine turn-by-turn follow-up question
+        const missingInfoList = analysis.missingInfo || [];
+        const nextQ = determineNextQuestion(missingInfoList, { description: ideaText });
+
+        let analysisMessageContent = '';
+        if (nextQ) {
+          const listText = missingInfoList.map((m, idx) => `${idx + 1}. ${m}`).join('\n');
+          analysisMessageContent = `Got it. This looks like a **${analysis.eventType}** for **${analysis.targetAudience || 'students'}**.\n\nTo create an accurate event plan, I need a few more details:\n${listText}\n\nLet's start with the **${nextQ.label}**: **${nextQ.question}**\n*(${nextQ.hint})*`;
+        } else {
+          analysisMessageContent = `Got it. This looks like a **${analysis.eventType}** for **${analysis.targetAudience || 'students'}**.\n\nI have all the necessary information. Generating your personalized event plan now...`;
+        }
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `ai-analysis-${Date.now()}`,
+            role: 'assistant',
+            content: analysisMessageContent,
+            analysis,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        ]);
+
+        if (nextQ) {
+          setScheduleWorkflow({
+            step: 'asking_followup',
+            data: {
+              originalIdea: ideaText,
+              analysis,
+              collected: { description: ideaText },
+              pendingQuestion: nextQ,
+              missingInfoList,
+            },
+          });
+        } else {
+          // No questions needed — generate plan immediately
+          await handleGeneratePlan({
+            analysis,
+            collected: { description: ideaText },
+          }, true);
+        }
+      } else {
+        // NO GEMINI KEY — use fallback turn-by-turn
+        setScheduleWorkflow({ step: 'asking_name', data: { description: ideaText } });
+        addAiMessage(`Sure! I'll help you create an event plan.\n\nWhat is the name of your event?`);
+      }
+    } catch (err) {
+      console.error('[Event Idea Error]:', err);
+      setErrorMessage('Failed to analyze event idea. Please try again.');
+    } finally {
+      setLoading(false);
+      setTimeout(() => textareaRef.current?.focus(), 100);
+    }
+  };
+
   // ─── handleSendMessage — Complete Workflow Engine ───────────────────────────
 
   const handleSendMessage = async (textToSend) => {
@@ -421,90 +508,31 @@ export default function AiAssistant() {
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
 
-    // ─── Check for event idea trigger first ──────────────────────────────────
-    const { isEventIdea } = detectEventIdea(query);
-
-    if (isEventIdea) {
-      setLoading(true);
-      try {
-        if (geminiAvailable) {
-          // GEMINI FLOW: Analyze the event idea
-          addAiMessage(
-            `🔍 **Analyzing your event idea...**\n\nLet me understand what you're planning before generating tasks.`,
-            {}
-          );
-
-          let analysis;
-          try {
-            analysis = await analyzeEventIdea(query);
-          } catch (geminiErr) {
-            console.warn('[Gemini Analysis Error]:', geminiErr.message);
-            // Fallback: proceed with minimal analysis
-            analysis = {
-              eventType: 'Event', eventScale: 'Medium', duration: '1 day',
-              targetAudience: 'Students', activities: [], operationalAreas: ['Logistics', 'Operations'],
-              requirements: [], risks: [], missingInfo: ['Event date', 'Venue'],
-              summary: query,
-            };
-          }
-
-          // Show analysis card + determine what questions to ask
-          const missingInfoList = analysis.missingInfo || [];
-          const nextQ = determineNextQuestion(missingInfoList, { description: query });
-
-          let analysisMessageContent = '';
-          if (nextQ) {
-            const listText = missingInfoList.map((m, idx) => `${idx + 1}. ${m}`).join('\n');
-            analysisMessageContent = `Got it. This looks like a **${analysis.eventType}** for **${analysis.targetAudience || 'students'}**.\n\nTo create an accurate event plan, I need:\n${listText}\n\nLet's start with the **${nextQ.label}**: **${nextQ.question}**\n*(${nextQ.hint})*`;
-          } else {
-            analysisMessageContent = `Got it. This looks like a **${analysis.eventType}** for **${analysis.targetAudience || 'students'}**.\n\nI have all the necessary information. Generating your personalized event plan now...`;
-          }
-
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `ai-analysis-${Date.now()}`,
-              role: 'assistant',
-              content: analysisMessageContent,
-              analysis,
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            },
-          ]);
-
-          if (nextQ) {
-            setScheduleWorkflow({
-              step: 'asking_followup',
-              data: {
-                originalIdea: query,
-                analysis,
-                collected: { description: query },
-                pendingQuestion: nextQ,
-                missingInfoList,
-              },
-            });
-          } else {
-            // No questions needed — generate plan immediately
-            await handleGeneratePlan({
-              analysis,
-              collected: { description: query },
-            }, true);
-          }
-        } else {
-          // NO GEMINI KEY — use fallback directly
-          setScheduleWorkflow({ step: 'asking_name', data: { description: query } });
-          addAiMessage(`Sure! I'll help you create an event plan.\n\nWhat is the name of your event?`);
-        }
-      } catch (err) {
-        console.error('[Event Idea Error]:', err);
-        setErrorMessage('Failed to analyze event idea. Please try again.');
-      } finally {
-        setLoading(false);
-        setTimeout(() => textareaRef.current?.focus(), 100);
-      }
+    // ─── 1. If currently waiting for user to provide their brief idea ────────
+    if (scheduleWorkflow.step === 'awaiting_event_idea') {
+      await processEventIdea(query);
       return;
     }
 
-    // ─── WORKFLOW: asking_followup → collect answer ─────────────────────────
+    // ─── 2. Check for generic planning command vs detailed idea ─────────────
+    const { isGenericTrigger, isDetailedIdea } = detectEventIdea(query);
+
+    if (isGenericTrigger && scheduleWorkflow.step !== 'asking_followup' && scheduleWorkflow.step !== 'editing') {
+      setScheduleWorkflow({ step: 'awaiting_event_idea', data: {} });
+      addAiMessage(
+        `I would love to help you plan your event! 🚀\n\nPlease share a **brief idea or description** of the event you want to organize (for example: event type, expected participants, duration, key activities, mentors/sponsors, etc.).`
+      );
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      return;
+    }
+
+    // ─── 3. Detailed event idea sent directly ────────────────────────────────
+    if (isDetailedIdea && scheduleWorkflow.step !== 'asking_followup' && scheduleWorkflow.step !== 'editing') {
+      await processEventIdea(query);
+      return;
+    }
+
+    // ─── 4. WORKFLOW: asking_followup → collect answer turn by turn ──────────
     if (scheduleWorkflow.step === 'asking_followup') {
       const { pendingQuestion, analysis, collected, missingInfoList = [] } = scheduleWorkflow.data;
       const field = pendingQuestion?.field;
@@ -521,7 +549,7 @@ export default function AiAssistant() {
       const nextQ = determineNextQuestion(remainingMissing, newCollected);
 
       if (nextQ) {
-        // Still more questions to ask
+        // Still more questions to ask turn by turn
         setScheduleWorkflow((prev) => ({
           step: 'asking_followup',
           data: {
@@ -1067,7 +1095,9 @@ export default function AiAssistant() {
               onKeyDown={handleKeyDown}
               disabled={loading}
               placeholder={
-                scheduleWorkflow.step === 'asking_followup'
+                scheduleWorkflow.step === 'awaiting_event_idea'
+                  ? 'Share your brief event idea (e.g. 2-day hackathon for 200 students with coding, mentors...)'
+                  : scheduleWorkflow.step === 'asking_followup'
                   ? (scheduleWorkflow.data?.pendingQuestion?.hint || 'Type your answer...')
                   : 'Describe your event idea or ask anything...'
               }
