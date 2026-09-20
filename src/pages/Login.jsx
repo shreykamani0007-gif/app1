@@ -50,6 +50,10 @@ export default function Login({ defaultMode = 'login' }) {
     setMode(newMode);
     setError('');
     setInfoMessage('');
+    if (newMode === 'register') {
+      setConfirmPassword('');
+    }
+    navigate(newMode === 'login' ? '/login' : '/register', { replace: true });
   };
 
   // Google OAuth handler with instant one-click demo login
@@ -102,6 +106,10 @@ export default function Login({ defaultMode = 'login' }) {
     if (mode === 'register') {
       if (!fullName.trim()) {
         setError('Full Name is required to create an account.');
+        return;
+      }
+      if (!confirmPassword) {
+        setError('Please confirm your password.');
         return;
       }
       if (password !== confirmPassword) {
@@ -231,7 +239,9 @@ export default function Login({ defaultMode = 'login' }) {
                   <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     id="fullName"
+                    name="name"
                     type="text"
+                    autoComplete="name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Alex Chen"
@@ -250,7 +260,9 @@ export default function Login({ defaultMode = 'login' }) {
                 <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   id="email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="alex.chen@campus.edu"
@@ -279,7 +291,9 @@ export default function Login({ defaultMode = 'login' }) {
                 <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   id="password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
@@ -306,7 +320,9 @@ export default function Login({ defaultMode = 'login' }) {
                   <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     id="confirmPassword"
+                    name="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••••••"
@@ -349,26 +365,33 @@ export default function Login({ defaultMode = 'login' }) {
           </form>
 
           {/* Demo Account Quick Fill */}
-          {mode === 'login' && (
-            <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs animate-fadeIn">
-              <div className="truncate pr-2">
-                <span className="font-bold text-slate-800 block text-xs">Demo Organizer Account</span>
-                <span className="text-slate-500 font-mono text-[11px]">alex.chen@clubops.org</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
+          <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs animate-fadeIn">
+            <div className="truncate pr-2">
+              <span className="font-bold text-slate-800 block text-xs">
+                {mode === 'login' ? 'Demo Organizer Account' : 'Demo Registration Credentials'}
+              </span>
+              <span className="text-slate-500 font-mono text-[11px]">alex.chen@clubops.org</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (mode === 'register') {
+                  setFullName('Alex Chen');
                   setEmail('alex.chen@clubops.org');
                   setPassword('Password123!');
-                  setError('');
-                  setInfoMessage('');
-                }}
-                className="px-3 py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors shrink-0 cursor-pointer shadow-2xs"
-              >
-                Auto-fill
-              </button>
-            </div>
-          )}
+                  setConfirmPassword('Password123!');
+                } else {
+                  setEmail('alex.chen@clubops.org');
+                  setPassword('Password123!');
+                }
+                setError('');
+                setInfoMessage('');
+              }}
+              className="px-3 py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors shrink-0 cursor-pointer shadow-2xs"
+            >
+              Auto-fill
+            </button>
+          </div>
 
           {/* Divider */}
           <div className="relative my-6">
