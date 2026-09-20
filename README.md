@@ -1,14 +1,11 @@
+
 # 🚀 ClubOps AI
 
 ### AI-Powered Event Operations Platform for College Clubs
 
 ClubOps AI is a centralized AI-powered event operations platform designed to help college clubs plan, organize, and execute events efficiently.
 
-<<<<<<< HEAD
 Instead of managing tasks, volunteers, meetings, documents, risks, and announcements across multiple platforms, ClubOps AI brings everything into one place.
-=======
-Instead of managing tasks, volunteers, meetings, documents, risks, and announcements across multiple platforms, ClubOps AI brings everything into one place with AI-assisted workflows in one centralized platform.
->>>>>>> d4b862a (Update README)
 
 ---
 
@@ -16,22 +13,22 @@ Instead of managing tasks, volunteers, meetings, documents, risks, and announcem
 
 College clubs often manage events using:
 
-* WhatsApp groups
-* Spreadsheets
-* Documents
-* Meeting notes
-* Personal task lists
+- WhatsApp groups
+- Spreadsheets
+- Documents
+- Meeting notes
+- Personal task lists
 
 As events grow, it becomes difficult to manage:
 
-* Tasks and deadlines
-* Task ownership
-* Volunteers
-* Meetings
-* Documents
-* Risks
-* Announcements
-* Event knowledge
+- Tasks and deadlines
+- Task ownership
+- Volunteers
+- Meetings
+- Documents
+- Risks
+- Announcements
+- Event knowledge
 
 ClubOps AI provides a centralized platform to solve these challenges.
 
@@ -43,16 +40,16 @@ ClubOps AI provides a single platform for managing the complete event lifecycle.
 
 ### Core Modules
 
-* 📊 Event Dashboard
-* ✅ Task Management
-* 👥 Volunteer Management
-* 📅 Meeting Management
-* 📄 Document Repository
-* ⚠️ Risk Management
-* 📢 Announcements
-* 🤖 AI Assistant
-* 🔐 Authentication
-* 🔑 Google Sign-In
+- 📊 Event Dashboard
+- ✅ Task Management
+- 👥 Volunteer Management
+- 📅 Meeting Management
+- 📄 Document Repository
+- ⚠️ Risk Management
+- 📢 Announcements
+- 🤖 AI Assistant
+- 🔐 Authentication
+- 🔑 Google Sign-In
 
 ---
 
@@ -62,14 +59,14 @@ ClubOps AI provides a single platform for managing the complete event lifecycle.
 
 Provides a quick overview of an event:
 
-* Total tasks
-* Completed tasks
-* Pending tasks
-* Upcoming deadlines
-* Volunteers
-* Open risks
-* Recent activity
-* AI insights
+- Total tasks
+- Completed tasks
+- Pending tasks
+- Upcoming deadlines
+- Volunteers
+- Open risks
+- Recent activity
+- AI insights
 
 ---
 
@@ -79,14 +76,14 @@ Every task belongs to a specific event.
 
 Features:
 
-* Create tasks
-* Assign task owners
-* Set deadlines
-* Set priorities
-* Track task status
-* Search and filter tasks
-* Track overdue tasks
-* Manage task dependencies
+- Create tasks
+- Assign task owners
+- Set deadlines
+- Set priorities
+- Track task status
+- Search and filter tasks
+- Track overdue tasks
+- Manage task dependencies
 
 ### Example
 
@@ -96,6 +93,7 @@ TechFest 2026
 ├── Arrange venue
 ├── Contact sponsors
 └── Configure Wi-Fi
+
 ```
 
 ---
@@ -106,12 +104,12 @@ Manage volunteers and their responsibilities.
 
 Features:
 
-* Volunteer profiles
-* Team assignment
-* Availability
-* Workload tracking
-* Task assignment
-* Volunteer status
+- Volunteer profiles
+- Team assignment
+- Availability
+- Workload tracking
+- Task assignment
+- Volunteer status
 
 ---
 
@@ -121,22 +119,22 @@ Manage event-related meetings from one place.
 
 Features:
 
-* Schedule meetings
-* Meeting agenda
-* Date and time
-* Location
-* Meeting type
-* Participants
-* View agenda
-* View members
-* Edit meetings
-* Event-specific meetings
+- Schedule meetings
+- Meeting agenda
+- Date and time
+- Location
+- Meeting type
+- Participants
+- View agenda
+- View members
+- Edit meetings
+- Event-specific meetings
 
 ### Meeting Types
 
-* In-person
-* Online
-* Hybrid
+- In-person
+- Online
+- Hybrid
 
 ---
 
@@ -146,13 +144,13 @@ Centralized repository for event-related information.
 
 Possible categories:
 
-* Event plans
-* Meeting notes
-* Sponsorship documents
-* Volunteer information
-* Rules
-* Budget documents
-* Other event resources
+- Event plans
+- Meeting notes
+- Sponsorship documents
+- Volunteer information
+- Rules
+- Budget documents
+- Other event resources
 
 ---
 
@@ -162,13 +160,13 @@ Identify and manage potential event risks.
 
 Risk information includes:
 
-* Risk description
-* Probability
-* Impact
-* Severity
-* Owner
-* Mitigation plan
-* Status
+- Risk description
+- Probability
+- Impact
+- Severity
+- Owner
+- Mitigation plan
+- Status
 
 ---
 
@@ -178,16 +176,16 @@ Create announcements for different groups.
 
 ### Target Groups
 
-* All volunteers
-* Organizers
-* Core team
-* Specific teams
+- All volunteers
+- Organizers
+- Core team
+- Specific teams
 
 ### Priorities
 
-* Normal
-* Important
-* Urgent
+- Normal
+- Important
+- Urgent
 
 ---
 
@@ -209,6 +207,7 @@ What are the major risks?
 Summarize the latest meeting.
 
 Create a task for Rahul to prepare the event poster by Friday.
+
 ```
 
 The AI Assistant helps organizers quickly access event information and perform event-related actions.
@@ -219,12 +218,12 @@ The AI Assistant helps organizers quickly access event information and perform e
 
 ClubOps AI provides secure user authentication with:
 
-* Email/password authentication
-* JWT-based authentication
-* Google Sign-In
-* Protected routes
-* User sessions
-* Logout
+- Email/password authentication
+- JWT-based authentication
+- Google Sign-In
+- Protected routes
+- User sessions
+- Logout
 
 ---
 
@@ -253,6 +252,7 @@ ClubOps AI provides secure user authentication with:
         ┌──────────┐     ┌──────────┐    ┌──────────┐
         │ MongoDB  │     │ AI Layer │    │   Auth   │
         └──────────┘     └──────────┘    └──────────┘
+
 ```
 
 ---
@@ -261,30 +261,30 @@ ClubOps AI provides secure user authentication with:
 
 ### Frontend
 
-* React.js
-* Vite
-* JavaScript
-* Tailwind CSS
-* React Router
+- React.js
+- Vite
+- JavaScript
+- Tailwind CSS
+- React Router
 
 ### Backend
 
-* Node.js
-* Express.js
+- Node.js
+- Express.js
 
 ### Database
 
-* MongoDB
-* Mongoose
+- MongoDB
+- Mongoose
 
 ### Authentication
 
-* JWT
-* Google OAuth
+- JWT
+- Google OAuth
 
 ### AI
 
-* AI-powered natural language assistant
+- AI-powered natural language assistant
 
 ---
 
@@ -315,7 +315,7 @@ ClubOps-AI/
 ├── .gitignore
 ├── package.json
 └── README.md
-<<<<<<< HEAD
+
 ```
 
 ---
@@ -327,6 +327,7 @@ ClubOps-AI/
 ```bash
 git clone https://github.com/shreykamani0007-gif/app1.git
 cd app1
+
 ```
 
 ## 2. Install Dependencies
@@ -336,6 +337,7 @@ cd app1
 ```bash
 cd client
 npm install
+
 ```
 
 ### Backend
@@ -343,6 +345,7 @@ npm install
 ```bash
 cd ../server
 npm install
+
 ```
 
 ## 3. Run the Application
@@ -352,6 +355,7 @@ Start the backend:
 ```bash
 cd server
 npm run dev
+
 ```
 
 Start the frontend in another terminal:
@@ -359,6 +363,7 @@ Start the frontend in another terminal:
 ```bash
 cd client
 npm run dev
+
 ```
 
 ---
@@ -391,21 +396,22 @@ Use AI Assistant
      │
      ▼
 Get Event Insights
+
 ```
 
 ---
 
 # 🔮 Future Improvements
 
-* 📱 Mobile application
-* 🔔 Real-time notifications
-* 📊 Advanced analytics
-* 🧠 Advanced AI agents
-* 🎤 AI meeting transcription
-* 📈 Predictive risk analysis
-* 🔗 Calendar integration
-* 💬 WhatsApp/Discord integration
-* 📧 Email notifications
+- 📱 Mobile application
+- 🔔 Real-time notifications
+- 📊 Advanced analytics
+- 🧠 Advanced AI agents
+- 🎤 AI meeting transcription
+- 📈 Predictive risk analysis
+- 🔗 Calendar integration
+- 💬 WhatsApp/Discord integration
+- 📧 Email notifications
 
 ---
 
@@ -442,6 +448,3 @@ This project is developed for educational and hackathon purposes.
 ## ⭐ Support
 
 If you find this project useful, consider giving the repository a ⭐ on GitHub.
-=======
-
->>>>>>> d4b862a (Update README)
