@@ -516,9 +516,14 @@ export default function AiAssistant() {
     setMessages(updatedMessages);
 
     // ─── 1. Step-by-Step Schedule Creation Workflow ─────────────────────────
+    const lastAiMsg = (messages.filter((m) => m.role === 'assistant').slice(-1)[0]?.content || '').trim();
 
     // Step 1: User answered event name
-    if (scheduleWorkflow.step === 'asking_name') {
+    const isAnsweringName =
+      scheduleWorkflow.step === 'asking_name' ||
+      lastAiMsg.includes('What is the name of the event?');
+
+    if (isAnsweringName) {
       const eventName = query;
       setScheduleWorkflow({
         step: 'asking_description',
@@ -530,11 +535,22 @@ export default function AiAssistant() {
     }
 
     // Step 2: User answered description
-    if (scheduleWorkflow.step === 'asking_description') {
+    const isAnsweringDesc =
+      scheduleWorkflow.step === 'asking_description' ||
+      lastAiMsg.includes('Briefly describe the event.');
+
+    if (isAnsweringDesc) {
       const description = query;
+      let name = scheduleWorkflow.data?.name;
+      if (!name) {
+        const nameIdx = messages.findIndex((m) => m.role === 'assistant' && m.content.includes('What is the name of the event?'));
+        if (nameIdx !== -1 && messages[nameIdx + 1]?.role === 'user') {
+          name = messages[nameIdx + 1].content;
+        }
+      }
       setScheduleWorkflow({
         step: 'asking_date',
-        data: { ...scheduleWorkflow.data, description },
+        data: { ...scheduleWorkflow.data, name: name || 'College Event', description },
       });
       addAiMessage('What is the event date?');
       setTimeout(() => textareaRef.current?.focus(), 100);
@@ -542,7 +558,11 @@ export default function AiAssistant() {
     }
 
     // Step 3: User answered event date
-    if (scheduleWorkflow.step === 'asking_date') {
+    const isAnsweringDate =
+      scheduleWorkflow.step === 'asking_date' ||
+      lastAiMsg.includes('What is the event date?');
+
+    if (isAnsweringDate) {
       const date = query;
       setScheduleWorkflow({
         step: 'asking_venue',
@@ -554,12 +574,35 @@ export default function AiAssistant() {
     }
 
     // Step 4: User answered venue → Show confirmation summary & Generate Plan
-    if (scheduleWorkflow.step === 'asking_venue') {
+    const isAnsweringVenue =
+      scheduleWorkflow.step === 'asking_venue' ||
+      lastAiMsg.includes('What is the venue?');
+
+    if (isAnsweringVenue) {
       const venue = query;
+      let name = scheduleWorkflow.data?.name;
+      let description = scheduleWorkflow.data?.description;
+      let date = scheduleWorkflow.data?.date;
+
+      if (!name || !description || !date) {
+        for (let i = 0; i < messages.length; i++) {
+          const m = messages[i];
+          if (m.role === 'assistant' && m.content.includes('What is the name of the event?') && messages[i + 1]?.role === 'user') {
+            name = name || messages[i + 1].content;
+          }
+          if (m.role === 'assistant' && m.content.includes('Briefly describe the event.') && messages[i + 1]?.role === 'user') {
+            description = description || messages[i + 1].content;
+          }
+          if (m.role === 'assistant' && m.content.includes('What is the event date?') && messages[i + 1]?.role === 'user') {
+            date = date || messages[i + 1].content;
+          }
+        }
+      }
+
       const fullDetails = {
-        name: scheduleWorkflow.data?.name || 'College Event',
-        description: scheduleWorkflow.data?.description || '',
-        date: scheduleWorkflow.data?.date || 'TBD',
+        name: name || 'College Event',
+        description: description || '',
+        date: date || 'TBD',
         venue,
       };
 
