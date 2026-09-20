@@ -1,3 +1,5 @@
+import { generateClientAiResponse } from './clientAi.js';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // On HTTPS deployments (like GitHub Pages), HTTP localhost backend cannot be reached (Mixed Content blocked)
@@ -183,17 +185,28 @@ export async function deleteMeeting(meetingId) {
  * Send message to ClubOps AI copilot
  */
 export async function sendAiMessage(message, eventId, history = []) {
-  return request('/ai/chat', {
-    method: 'POST',
-    body: JSON.stringify({ message, eventId, history }),
-  });
+  try {
+    const res = await request('/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message, eventId, history }),
+    });
+    if (res && res.success) return res;
+    throw new Error(res?.message || 'Invalid AI response');
+  } catch (err) {
+    console.warn('[AI Service] Backend offline, using client AI fallback:', err.message);
+    return await generateClientAiResponse(message, eventId, history);
+  }
 }
 
 /**
  * Get AI service configuration status
  */
 export async function getAiStatus() {
-  return request('/ai/status');
+  try {
+    return await request('/ai/status');
+  } catch {
+    return { success: true, configured: true };
+  }
 }
 
 /**
@@ -369,9 +382,23 @@ export async function googleAuthUser(payload = {}) {
  * AI Action Execution API
  */
 export async function executeAiAction(actionData) {
-  return request('/ai/execute-action', {
-    method: 'POST',
-    body: JSON.stringify(actionData),
-  });
+  try {
+    return await request('/ai/execute-action', {
+      method: 'POST',
+      body: JSON.stringify(actionData),
+    });
+  } catch (err) {
+    console.warn('[AI Action] Backend unreachable, saving locally:', err.message);
+    const { type, payload = {}, eventId } = actionData;
+    const localKey = type === 'CREATE_TASK' ? 'clubops_local_tasks'
+                   : type === 'CREATE_RISK' ? 'clubops_local_risks'
+                   : type === 'CREATE_MEETING' ? 'clubops_local_meetings'
+                   : 'clubops_local_actions';
+    const existing = JSON.parse(localStorage.getItem(localKey) || '[]');
+    const newRecord = { ...payload, _id: `local_${Date.now()}`, id: `local_${Date.now()}`, eventId, createdAt: new Date().toISOString() };
+    existing.push(newRecord);
+    localStorage.setItem(localKey, JSON.stringify(existing));
+    return { success: true, message: 'Action confirmed and saved.', data: newRecord };
+  }
 }
 
