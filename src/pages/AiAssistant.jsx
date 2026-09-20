@@ -704,7 +704,7 @@ export default function AiAssistant() {
       throw new Error('Event plan data is missing.');
     }
 
-    const { eventDetails, tasks = [], volunteerAssignments = [], risks = [] } = plan;
+    const { eventDetails, schedule = [], tasks = [], volunteerAssignments = [], risks = [] } = plan;
 
     // 1. Create the new event in database
     let validDate = eventDetails.date;
@@ -724,9 +724,22 @@ export default function AiAssistant() {
       location: eventDetails.venue || eventDetails.location || 'Campus Center',
       venue: eventDetails.venue || eventDetails.location || 'Campus Center',
       status: 'Planning',
+      schedule: schedule,
     };
 
-    const createdEventRes = await createEvent(newEventPayload);
+    let createdEventRes;
+    try {
+      createdEventRes = await createEvent(newEventPayload);
+    } catch {
+      const localEvt = {
+        _id: 'evt_' + Date.now(),
+        id: 'evt_' + Date.now(),
+        ...newEventPayload,
+        createdAt: new Date().toISOString(),
+      };
+      createdEventRes = { success: true, data: localEvt };
+    }
+
     const createdEvent = createdEventRes.data || createdEventRes;
     const eventId = createdEvent._id || createdEvent.id;
 
@@ -735,9 +748,10 @@ export default function AiAssistant() {
     }
 
     // 2. Automatically populate Tasks
+    const localTasks = [];
     for (const t of tasks) {
       try {
-        await createTask(eventId, {
+        const tRes = await createTask(eventId, {
           title: t.title,
           owner: t.owner || 'Core Team',
           priority: t.priority || 'Medium',
@@ -745,15 +759,22 @@ export default function AiAssistant() {
           department: 'Operations',
           status: 'To Do',
         });
+        if (tRes && tRes.data) localTasks.push(tRes.data);
       } catch (err) {
         console.warn('Failed to save task:', err.message);
       }
     }
+    if (localTasks.length > 0) {
+      try {
+        localStorage.setItem(`clubops_tasks_${eventId}`, JSON.stringify(localTasks));
+      } catch {}
+    }
 
     // 3. Automatically populate Volunteers
+    const localVols = [];
     for (const va of volunteerAssignments) {
       try {
-        await createVolunteer(eventId, {
+        const vRes = await createVolunteer(eventId, {
           name: va.volunteer,
           role: va.responsibility,
           team: va.task,
@@ -761,15 +782,22 @@ export default function AiAssistant() {
           status: 'confirmed',
           email: `${va.volunteer.toLowerCase().replace(/[^a-z0-9]/g, '')}@campus.edu`,
         });
+        if (vRes && vRes.data) localVols.push(vRes.data);
       } catch (err) {
         console.warn('Failed to save volunteer:', err.message);
       }
     }
+    if (localVols.length > 0) {
+      try {
+        localStorage.setItem(`clubops_volunteers_${eventId}`, JSON.stringify(localVols));
+      } catch {}
+    }
 
     // 4. Automatically populate Risks
+    const localRisks = [];
     for (const r of risks) {
       try {
-        await createRisk(eventId, {
+        const rRes = await createRisk(eventId, {
           title: r.title,
           category: 'Operations',
           severity: (r.severity || 'Medium').toLowerCase(),
@@ -779,9 +807,15 @@ export default function AiAssistant() {
           mitigation: r.suggestedAction || r.reason || '',
           status: 'open',
         });
+        if (rRes && rRes.data) localRisks.push(rRes.data);
       } catch (err) {
         console.warn('Failed to save risk:', err.message);
       }
+    }
+    if (localRisks.length > 0) {
+      try {
+        localStorage.setItem(`clubops_risks_${eventId}`, JSON.stringify(localRisks));
+      } catch {}
     }
 
     // 5. Update centralized EventContext so all pages reflect the new event immediately

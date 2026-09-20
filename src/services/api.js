@@ -1,4 +1,5 @@
 import { generateClientAiResponse } from './clientAi.js';
+import { defaultVolunteersByEvent } from '../data/volunteersData';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -63,24 +64,57 @@ export async function checkHealth() {
  * Get all events
  */
 export async function getEvents() {
-  return request('/events');
+  try {
+    return await request('/events');
+  } catch (err) {
+    try {
+      const cached = JSON.parse(localStorage.getItem('clubops_events_cache') || '[]');
+      if (cached.length > 0) return { success: true, data: cached };
+    } catch {}
+    return { success: true, data: [] };
+  }
 }
 
 /**
  * Get single event by ID
  */
 export async function getEvent(id) {
-  return request(`/events/${id}`);
+  try {
+    return await request(`/events/${id}`);
+  } catch (err) {
+    try {
+      const cached = JSON.parse(localStorage.getItem('clubops_events_cache') || '[]');
+      const found = cached.find((e) => (e._id || e.id) === id);
+      if (found) return { success: true, data: found };
+    } catch {}
+    throw err;
+  }
 }
 
 /**
  * Create a new event
  */
 export async function createEvent(eventData) {
-  return request('/events', {
-    method: 'POST',
-    body: JSON.stringify(eventData),
-  });
+  try {
+    return await request('/events', {
+      method: 'POST',
+      body: JSON.stringify(eventData),
+    });
+  } catch (err) {
+    console.warn('[API] createEvent offline fallback:', err.message);
+    const newEvent = {
+      _id: 'evt_' + Date.now(),
+      id: 'evt_' + Date.now(),
+      ...eventData,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      const cached = JSON.parse(localStorage.getItem('clubops_events_cache') || '[]');
+      cached.unshift(newEvent);
+      localStorage.setItem('clubops_events_cache', JSON.stringify(cached));
+    } catch {}
+    return { success: true, data: newEvent };
+  }
 }
 
 /**
@@ -106,17 +140,42 @@ export async function deleteEvent(id) {
  * Get all tasks belonging to an event
  */
 export async function getTasksByEvent(eventId) {
-  return request(`/events/${eventId}/tasks`);
+  try {
+    return await request(`/events/${eventId}/tasks`);
+  } catch (err) {
+    try {
+      const cached = JSON.parse(localStorage.getItem(`clubops_tasks_${eventId}`) || '[]');
+      return { success: true, data: cached };
+    } catch {}
+    return { success: true, data: [] };
+  }
 }
 
 /**
  * Create a new task belonging to an event
  */
 export async function createTask(eventId, taskData) {
-  return request(`/events/${eventId}/tasks`, {
-    method: 'POST',
-    body: JSON.stringify(taskData),
-  });
+  try {
+    return await request(`/events/${eventId}/tasks`, {
+      method: 'POST',
+      body: JSON.stringify(taskData),
+    });
+  } catch (err) {
+    console.warn('[API] createTask offline fallback:', err.message);
+    const newTask = {
+      _id: 'task_' + Date.now() + Math.random().toString(36).substr(2, 4),
+      id: 'task_' + Date.now() + Math.random().toString(36).substr(2, 4),
+      eventId,
+      ...taskData,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      const cached = JSON.parse(localStorage.getItem(`clubops_tasks_${eventId}`) || '[]');
+      cached.push(newTask);
+      localStorage.setItem(`clubops_tasks_${eventId}`, JSON.stringify(cached));
+    } catch {}
+    return { success: true, data: newTask };
+  }
 }
 
 /**
@@ -213,7 +272,16 @@ export async function getAiStatus() {
  * Volunteers API
  */
 export async function getVolunteersByEvent(eventId) {
-  return request(`/events/${eventId}/volunteers`);
+  try {
+    return await request(`/events/${eventId}/volunteers`);
+  } catch (err) {
+    try {
+      const cached = JSON.parse(localStorage.getItem(`clubops_volunteers_${eventId}`) || '[]');
+      if (cached.length > 0) return { success: true, data: cached };
+    } catch {}
+    const defs = defaultVolunteersByEvent[eventId] || defaultVolunteersByEvent['evt_innovatex_2026'] || [];
+    return { success: true, data: defs };
+  }
 }
 
 export async function getVolunteer(id) {
@@ -221,10 +289,27 @@ export async function getVolunteer(id) {
 }
 
 export async function createVolunteer(eventId, volunteerData) {
-  return request(`/events/${eventId}/volunteers`, {
-    method: 'POST',
-    body: JSON.stringify(volunteerData),
-  });
+  try {
+    return await request(`/events/${eventId}/volunteers`, {
+      method: 'POST',
+      body: JSON.stringify(volunteerData),
+    });
+  } catch (err) {
+    console.warn('[API] createVolunteer offline fallback:', err.message);
+    const newVol = {
+      _id: 'vol_' + Date.now() + Math.random().toString(36).substr(2, 4),
+      id: 'vol_' + Date.now() + Math.random().toString(36).substr(2, 4),
+      eventId,
+      ...volunteerData,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      const cached = JSON.parse(localStorage.getItem(`clubops_volunteers_${eventId}`) || '[]');
+      cached.push(newVol);
+      localStorage.setItem(`clubops_volunteers_${eventId}`, JSON.stringify(cached));
+    } catch {}
+    return { success: true, data: newVol };
+  }
 }
 
 export async function updateVolunteer(id, volunteerData) {
@@ -275,7 +360,15 @@ export async function deleteDocument(id) {
  * Risks API
  */
 export async function getRisksByEvent(eventId) {
-  return request(`/events/${eventId}/risks`);
+  try {
+    return await request(`/events/${eventId}/risks`);
+  } catch (err) {
+    try {
+      const cached = JSON.parse(localStorage.getItem(`clubops_risks_${eventId}`) || '[]');
+      return { success: true, data: cached };
+    } catch {}
+    return { success: true, data: [] };
+  }
 }
 
 export async function getRisk(id) {
@@ -283,10 +376,27 @@ export async function getRisk(id) {
 }
 
 export async function createRisk(eventId, riskData) {
-  return request(`/events/${eventId}/risks`, {
-    method: 'POST',
-    body: JSON.stringify(riskData),
-  });
+  try {
+    return await request(`/events/${eventId}/risks`, {
+      method: 'POST',
+      body: JSON.stringify(riskData),
+    });
+  } catch (err) {
+    console.warn('[API] createRisk offline fallback:', err.message);
+    const newRisk = {
+      _id: 'risk_' + Date.now() + Math.random().toString(36).substr(2, 4),
+      id: 'risk_' + Date.now() + Math.random().toString(36).substr(2, 4),
+      eventId,
+      ...riskData,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      const cached = JSON.parse(localStorage.getItem(`clubops_risks_${eventId}`) || '[]');
+      cached.push(newRisk);
+      localStorage.setItem(`clubops_risks_${eventId}`, JSON.stringify(cached));
+    } catch {}
+    return { success: true, data: newRisk };
+  }
 }
 
 export async function updateRisk(id, riskData) {
