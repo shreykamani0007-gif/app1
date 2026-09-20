@@ -73,32 +73,27 @@ async function callGemini(prompt) {
   let lastError = null;
 
   for (const model of CANDIDATE_MODELS) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-        config: {
-          temperature: 0.2,
-          maxOutputTokens: 8192,
-          responseMimeType: 'application/json',
-        },
-      });
-      const text = response?.candidates?.[0]?.content?.parts?.[0]?.text || response?.text || '';
-      if (text && text.trim()) return text;
-    } catch (err) {
-      console.warn(`[Gemini Model ${model}]:`, err.message);
-      lastError = err;
-      const isRetryable =
-        err.message &&
-        (err.message.includes('404') ||
-          err.message.includes('NOT_FOUND') ||
-          err.message.includes('503') ||
-          err.message.includes('UNAVAILABLE') ||
-          err.message.includes('RESOURCE_EXHAUSTED') ||
-          err.message.includes('quota'));
-      if (isRetryable) continue;
-      // Continue trying other candidates
-      continue;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            temperature: 0.2,
+            maxOutputTokens: 8192,
+            responseMimeType: 'application/json',
+          },
+        });
+        const text = response?.candidates?.[0]?.content?.parts?.[0]?.text || response?.text || '';
+        if (text && text.trim()) return text;
+      } catch (err) {
+        lastError = err;
+        if (err.message && (err.message.includes('503') || err.message.includes('UNAVAILABLE') || err.message.includes('overloaded') || err.message.includes('high demand'))) {
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+        break;
+      }
     }
   }
 
@@ -309,6 +304,8 @@ Respond ONLY with valid JSON (no markdown, no extra text):
       "taskTitle": "exact task title",
       "volunteerId": "volunteer id or null",
       "volunteerName": "volunteer name or null",
+      "responsibility": "specific responsibility (e.g. Registration Desk, AV Setup, Entry Management)",
+      "time": "reporting time or shift (e.g. 09:00 AM)",
       "matchReason": "why this volunteer matches (mention their role/team)",
       "noMatchReason": "why no match was found (only if volunteerId is null)"
     }
@@ -344,14 +341,17 @@ Generate at least 12-18 tasks covering all operational areas. Make them realisti
     status: 'To Do',
   }));
 
-  const normalizedVolAssignments = (plan.volunteerAssignments || []).map(va => {
+  const normalizedVolAssignments = (plan.volunteerAssignments || []).map((va, idx) => {
     const hasMatch = Boolean(va.hasMatch !== false && va.volunteerId && va.volunteerName);
+    const defaultTimes = ['08:00 AM', '09:00 AM', '09:30 AM', '10:00 AM', '11:00 AM', '01:00 PM'];
     return {
       taskTitle: va.taskTitle || '',
       volunteerId: hasMatch ? va.volunteerId : null,
       volunteerName: hasMatch ? va.volunteerName : null,
+      responsibility: va.responsibility || (hasMatch ? `${va.volunteerName}'s Operational Task` : 'Unassigned'),
+      time: va.time || defaultTimes[idx % defaultTimes.length],
       matchReason: hasMatch ? (va.matchReason || 'Matched by role & skill') : '',
-      noMatchReason: hasMatch ? '' : (va.noMatchReason || 'No suitable volunteer found for this task.'),
+      noMatchReason: hasMatch ? '' : (va.noMatchReason || '⚠️ Not enough volunteers available for this task.'),
       hasMatch,
     };
   });

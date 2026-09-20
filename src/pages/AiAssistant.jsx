@@ -288,16 +288,21 @@ function generateFallbackPlan(details, availableVolunteers = []) {
     'Sponsorship': ['Marketing', 'Operations'],
   };
 
-  const volunteerAssignments = tasks.slice(0, 6).map((task) => {
+  const volunteerAssignments = tasks.slice(0, 6).map((task, idx) => {
     const relatedTeams = SKILL_TEAM_MAP[task.category] || [];
     const matched = availableVolunteers.find(
       (v) => relatedTeams.some((team) => (v.team || '').toLowerCase().includes(team.toLowerCase()))
     );
+    const defaultTimes = ['08:00 AM', '09:00 AM', '09:30 AM', '10:00 AM', '01:00 PM', '05:00 PM'];
+    const time = defaultTimes[idx % defaultTimes.length];
+    const responsibility = task.suggestedRole || `${task.category} Management`;
     if (matched) {
       return {
         taskTitle: task.title,
         volunteerId: matched.id || matched._id,
         volunteerName: matched.name,
+        responsibility,
+        time,
         matchReason: `Matched by team: ${matched.team} (skill: ${task.category})`,
         noMatchReason: '',
         hasMatch: true,
@@ -307,8 +312,10 @@ function generateFallbackPlan(details, availableVolunteers = []) {
       taskTitle: task.title,
       volunteerId: null,
       volunteerName: null,
+      responsibility,
+      time,
       matchReason: '',
-      noMatchReason: `No volunteer with ${task.category} skills found. Please assign manually.`,
+      noMatchReason: '⚠️ Not enough volunteers available for this task.',
       hasMatch: false,
     };
   });
@@ -508,31 +515,138 @@ export default function AiAssistant() {
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
 
-    // ─── 1. If currently waiting for user to provide their brief idea ────────
+    // ─── 1. Step-by-Step Schedule Creation Workflow ─────────────────────────
+
+    // Step 1: User answered event name
+    if (scheduleWorkflow.step === 'asking_name') {
+      const eventName = query;
+      setScheduleWorkflow({
+        step: 'asking_description',
+        data: { ...scheduleWorkflow.data, name: eventName },
+      });
+      addAiMessage('Briefly describe the event.');
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      return;
+    }
+
+    // Step 2: User answered description
+    if (scheduleWorkflow.step === 'asking_description') {
+      const description = query;
+      setScheduleWorkflow({
+        step: 'asking_date',
+        data: { ...scheduleWorkflow.data, description },
+      });
+      addAiMessage('What is the event date?');
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      return;
+    }
+
+    // Step 3: User answered event date
+    if (scheduleWorkflow.step === 'asking_date') {
+      const date = query;
+      setScheduleWorkflow({
+        step: 'asking_venue',
+        data: { ...scheduleWorkflow.data, date },
+      });
+      addAiMessage('What is the venue?');
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      return;
+    }
+
+    // Step 4: User answered venue → Show confirmation summary & Generate Plan
+    if (scheduleWorkflow.step === 'asking_venue') {
+      const venue = query;
+      const fullDetails = {
+        name: scheduleWorkflow.data?.name || 'College Event',
+        description: scheduleWorkflow.data?.description || '',
+        date: scheduleWorkflow.data?.date || 'TBD',
+        venue,
+      };
+
+      addAiMessage(
+        `### EVENT DETAILS\n\n**Event Name**: ${fullDetails.name}\n**Description**: ${fullDetails.description}\n**Date**: ${fullDetails.date}\n**Venue**: ${fullDetails.venue}\n\nI've analyzed the event details. I'll now create a suggested schedule, tasks, volunteer assignments, deadlines, and potential risks.`
+      );
+
+      setLoading(true);
+      try {
+        let analysis = {
+          eventType: fullDetails.name,
+          eventScale: 'Medium',
+          duration: '1 day',
+          targetAudience: 'Students & Attendees',
+          activities: [],
+          operationalAreas: ['Operations', 'Logistics', 'Technical', 'Hospitality'],
+          requirements: [],
+          risks: [],
+          summary: fullDetails.description,
+        };
+
+        if (geminiAvailable) {
+          try {
+            const analyzed = await analyzeEventIdea(
+              `${fullDetails.name}: ${fullDetails.description}. Date: ${fullDetails.date}, Venue: ${fullDetails.venue}`
+            );
+            if (analyzed) analysis = { ...analysis, ...analyzed };
+          } catch (e) {
+            console.warn('[Gemini Idea Analysis Error]:', e);
+          }
+        }
+
+        await handleGeneratePlan({
+          analysis,
+          collected: fullDetails,
+        });
+      } catch (err) {
+        console.error('[Generate Plan Error]:', err);
+        setErrorMessage('Failed to generate event plan.');
+      } finally {
+        setLoading(false);
+        setTimeout(() => textareaRef.current?.focus(), 100);
+      }
+      return;
+    }
+
+    // ─── 2. If currently waiting for user to provide their brief idea ────────
     if (scheduleWorkflow.step === 'awaiting_event_idea') {
       await processEventIdea(query);
       return;
     }
 
-    // ─── 2. Check for generic planning command vs detailed idea ─────────────
-    const { isGenericTrigger, isDetailedIdea } = detectEventIdea(query);
+    // ─── 3. Check for Schedule / Planning Trigger vs Detailed Idea ──────────
+    const { isScheduleTrigger, isDetailedIdea } = detectEventIdea(query);
 
-    if (isGenericTrigger && scheduleWorkflow.step !== 'asking_followup' && scheduleWorkflow.step !== 'editing') {
-      setScheduleWorkflow({ step: 'awaiting_event_idea', data: {} });
+    if (
+      isScheduleTrigger &&
+      scheduleWorkflow.step !== 'asking_name' &&
+      scheduleWorkflow.step !== 'asking_description' &&
+      scheduleWorkflow.step !== 'asking_date' &&
+      scheduleWorkflow.step !== 'asking_venue' &&
+      scheduleWorkflow.step !== 'asking_followup' &&
+      scheduleWorkflow.step !== 'editing'
+    ) {
+      setScheduleWorkflow({ step: 'asking_name', data: {} });
       addAiMessage(
-        `I would love to help you plan your event! 🚀\n\nPlease share a **brief idea or description** of the event you want to organize (for example: event type, expected participants, duration, key activities, mentors/sponsors, etc.).`
+        `Sure! I'll help you create the event schedule. Let's start with the basics.\n\nWhat is the name of the event?`
       );
       setTimeout(() => textareaRef.current?.focus(), 100);
       return;
     }
 
-    // ─── 3. Detailed event idea sent directly ────────────────────────────────
-    if (isDetailedIdea && scheduleWorkflow.step !== 'asking_followup' && scheduleWorkflow.step !== 'editing') {
+    // ─── 4. Detailed event idea sent directly ────────────────────────────────
+    if (
+      isDetailedIdea &&
+      scheduleWorkflow.step !== 'asking_name' &&
+      scheduleWorkflow.step !== 'asking_description' &&
+      scheduleWorkflow.step !== 'asking_date' &&
+      scheduleWorkflow.step !== 'asking_venue' &&
+      scheduleWorkflow.step !== 'asking_followup' &&
+      scheduleWorkflow.step !== 'editing'
+    ) {
       await processEventIdea(query);
       return;
     }
 
-    // ─── 4. WORKFLOW: asking_followup → collect answer turn by turn ──────────
+    // ─── 5. WORKFLOW: asking_followup → collect answer turn by turn ──────────
     if (scheduleWorkflow.step === 'asking_followup') {
       const { pendingQuestion, analysis, collected, missingInfoList = [] } = scheduleWorkflow.data;
       const field = pendingQuestion?.field;
@@ -573,7 +687,7 @@ export default function AiAssistant() {
       return;
     }
 
-    // ─── WORKFLOW: plan editing ─────────────────────────────────────────────
+    // ─── 6. WORKFLOW: plan editing ──────────────────────────────────────────
     if (scheduleWorkflow.step === 'editing') {
       setLoading(true);
       try {
@@ -590,49 +704,6 @@ export default function AiAssistant() {
         await handleGeneratePlan({ analysis, collected: updatedCollected });
       } catch (err) {
         setErrorMessage('Failed to update event plan.');
-      } finally {
-        setLoading(false);
-        setTimeout(() => textareaRef.current?.focus(), 100);
-      }
-      return;
-    }
-
-    // ─── LEGACY fallback workflow (no Gemini key) ───────────────────────────
-    if (scheduleWorkflow.step === 'asking_name') {
-      setScheduleWorkflow((prev) => ({ step: 'asking_date', data: { ...prev.data, name: query } }));
-      addAiMessage('What is the event date?');
-      setTimeout(() => textareaRef.current?.focus(), 100);
-      return;
-    }
-    if (scheduleWorkflow.step === 'asking_date') {
-      setScheduleWorkflow((prev) => ({ step: 'asking_venue', data: { ...prev.data, date: query } }));
-      addAiMessage('What is the venue?');
-      setTimeout(() => textareaRef.current?.focus(), 100);
-      return;
-    }
-    if (scheduleWorkflow.step === 'asking_venue') {
-      setLoading(true);
-      const fullDetails = { ...scheduleWorkflow.data, venue: query };
-      try {
-        let existingVolunteers = [];
-        try {
-          const volRes = await getVolunteersByEvent(selectedEventId);
-          if (volRes?.success && Array.isArray(volRes.data)) existingVolunteers = volRes.data;
-        } catch {}
-        const generatedPlan = generateFallbackPlan(fullDetails, existingVolunteers);
-        setScheduleWorkflow({ step: 'plan_ready', data: { ...fullDetails, plan: generatedPlan } });
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `ai-plan-${Date.now()}`,
-            role: 'assistant',
-            content: `✅ **Event plan generated for "${fullDetails.name}"!**\n\nHere's your complete operational blueprint. Review and confirm to save everything to your dashboard.`,
-            eventPlan: generatedPlan,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          },
-        ]);
-      } catch (err) {
-        setErrorMessage('Failed to generate event plan.');
       } finally {
         setLoading(false);
         setTimeout(() => textareaRef.current?.focus(), 100);

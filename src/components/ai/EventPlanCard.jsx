@@ -343,23 +343,33 @@ export default function EventPlanCard({ plan, onAddToDashboard, onEditPlan }) {
 
           <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
             {volunteerAssignments.map((va, idx) => (
-              <div key={idx} className="p-3 text-xs flex items-start gap-3 flex-wrap hover:bg-slate-50/60 transition-colors">
+              <div key={idx} className="p-3 text-xs flex items-center justify-between gap-3 flex-wrap hover:bg-slate-50/60 transition-colors">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className={`shrink-0 w-5 h-5 rounded-full font-bold flex items-center justify-center text-[10px] ${va.hasMatch ? 'bg-teal-100 text-teal-700' : 'bg-rose-100 text-rose-600'}`}>
                     {idx + 1}
                   </span>
-                  <span className="font-semibold text-slate-800 truncate">{va.taskTitle}</span>
+                  <span className="font-bold text-slate-800">{va.taskTitle}</span>
+                  <span className="text-slate-400">→</span>
+                  {va.hasMatch ? (
+                    <span className="font-semibold text-teal-700 flex items-center gap-1">
+                      <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                      {va.volunteerName}
+                    </span>
+                  ) : (
+                    <span className="text-rose-600 font-medium">⚠️ Not enough volunteers available for this task.</span>
+                  )}
                 </div>
-                {va.hasMatch ? (
-                  <div className="flex items-center gap-1.5 text-teal-700">
-                    <UserCheck className="w-3.5 h-3.5 shrink-0" />
-                    <span className="font-medium">{va.volunteerName}</span>
-                    {va.matchReason && <span className="text-[10px] text-slate-400 truncate max-w-[120px]">({va.matchReason})</span>}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5 text-rose-600">
-                    <UserX className="w-3.5 h-3.5 shrink-0" />
-                    <span className="font-medium">No suitable volunteer found</span>
+                {va.hasMatch && (
+                  <div className="flex items-center gap-2 text-[11px] shrink-0">
+                    <span className="text-slate-400">→</span>
+                    <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-medium border border-indigo-100">
+                      {va.responsibility || 'Task Lead'}
+                    </span>
+                    <span className="text-slate-400">→</span>
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium border border-slate-200 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-slate-500" />
+                      {va.time || '09:00 AM'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -392,7 +402,7 @@ export default function EventPlanCard({ plan, onAddToDashboard, onEditPlan }) {
                 {r.reason && <p className="text-xs text-slate-600 pl-6"><strong className="text-slate-700">Reason:</strong> {r.reason}</p>}
                 {(r.mitigation || r.suggestedAction) && (
                   <p className="text-xs text-emerald-800 bg-emerald-50/80 p-2 rounded-lg border border-emerald-100 pl-6">
-                    <strong className="text-emerald-900">Mitigation:</strong> {r.mitigation || r.suggestedAction}
+                    <strong className="text-emerald-900">Suggested Action:</strong> {r.mitigation || r.suggestedAction}
                   </p>
                 )}
               </div>
@@ -406,14 +416,14 @@ export default function EventPlanCard({ plan, onAddToDashboard, onEditPlan }) {
         {status === 'pending' && (
           <div className="space-y-3">
             <p className="text-xs sm:text-sm font-bold text-slate-900">
-              Would you like to add this event plan to the dashboard?
+              Your event plan is ready. Would you like me to add this event to the dashboard?
             </p>
             <div className="flex items-center gap-3 flex-wrap">
               <Button variant="primary" size="sm" icon={CheckCircle2} onClick={handleConfirm} className="shadow-sm bg-emerald-600 hover:bg-emerald-700">
-                Yes, Add to Dashboard
+                Add to Dashboard
               </Button>
               <Button variant="outline" size="sm" icon={Edit3} onClick={() => onEditPlan && onEditPlan(plan)}>
-                No, Modify Plan
+                Edit Plan
               </Button>
             </div>
           </div>
