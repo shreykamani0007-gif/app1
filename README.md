@@ -4,7 +4,11 @@
 
 ClubOps AI is a centralized AI-powered event operations platform designed to help college clubs plan, organize, and execute events efficiently.
 
+<<<<<<< HEAD
 Instead of managing tasks, volunteers, meetings, documents, risks, and announcements across multiple platforms, ClubOps AI brings everything into one place.
+=======
+Instead of managing tasks, volunteers, meetings, documents, risks, and announcements across multiple platforms, ClubOps AI brings everything into one place with AI-assisted workflows in one centralized platform.
+>>>>>>> d4b862a (Update README)
 
 ---
 
@@ -311,6 +315,7 @@ ClubOps-AI/
 ├── .gitignore
 ├── package.json
 └── README.md
+<<<<<<< HEAD
 ```
 
 ---
@@ -437,3 +442,6 @@ This project is developed for educational and hackathon purposes.
 ## ⭐ Support
 
 If you find this project useful, consider giving the repository a ⭐ on GitHub.
+=======
+
+>>>>>>> d4b862a (Update README)
