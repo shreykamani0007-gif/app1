@@ -144,11 +144,15 @@ function generateFallbackPlan(details, availableVolunteers = []) {
   }
   const getVol = (idx) => volunteerPool[idx % volunteerPool.length];
 
-  const eventDate = date ? new Date(date) : new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
+  let eventDate = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
+  if (date) {
+    const parsed = new Date(date);
+    if (!isNaN(parsed.getTime())) eventDate = parsed;
+  }
   const daysOffset = (d) => {
     const dt = new Date(eventDate);
     dt.setDate(dt.getDate() + d);
-    return dt.toISOString().split('T')[0];
+    return !isNaN(dt.getTime()) ? dt.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
   };
 
   let tasks = [];
@@ -417,75 +421,10 @@ export default function AiAssistant() {
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
 
-    // ─── WORKFLOW: asking_followup → collect answer ─────────────────────────
-    if (scheduleWorkflow.step === 'asking_followup') {
-      const { pendingQuestion, analysis, collected, missingInfoList = [] } = scheduleWorkflow.data;
-      const field = pendingQuestion?.field;
-      const label = pendingQuestion?.label || field;
-
-      // Store the answer
-      const newCollected = { ...collected, [field]: query, [label]: query };
-
-      // Filter out the answered item
-      const remainingMissing = missingInfoList.filter(
-        (f) => !f.toLowerCase().includes(field.toLowerCase()) && !field.toLowerCase().includes(f.toLowerCase())
-      );
-
-      const nextQ = determineNextQuestion(remainingMissing, newCollected);
-
-      if (nextQ) {
-        // Still more questions to ask
-        setScheduleWorkflow((prev) => ({
-          step: 'asking_followup',
-          data: {
-            ...prev.data,
-            collected: newCollected,
-            pendingQuestion: nextQ,
-            missingInfoList: remainingMissing,
-          },
-        }));
-        addAiMessage(
-          `Got it! **${label}**: *${query}*\n\nNext, **${nextQ.question}**\n*(${nextQ.hint})*`
-        );
-      } else {
-        // All info collected — generate the plan
-        addAiMessage(
-          `Got it! **${label}**: *${query}*\n\nAll necessary information collected. Generating your personalized event plan now...`
-        );
-        await handleGeneratePlan({ ...scheduleWorkflow.data, collected: newCollected, analysis });
-      }
-      setTimeout(() => textareaRef.current?.focus(), 100);
-      return;
-    }
-
-    // ─── WORKFLOW: plan editing ─────────────────────────────────────────────
-    if (scheduleWorkflow.step === 'editing') {
-      setLoading(true);
-      try {
-        const { analysis, collected } = scheduleWorkflow.data;
-        // Parse any update hints from user
-        const venueMatch = query.match(/venue\s+(?:to\s+|is\s+)?([a-z0-9\s,.-]+?)(?:\s+and|\s+date|\s+time|$)/i);
-        const dateMatch = query.match(/date\s+(?:to\s+|is\s+)?([a-z0-9\s,.-]+?)(?:\s+and|\s+venue|\s+time|$)/i);
-        const updatedCollected = {
-          ...collected,
-          ...(venueMatch ? { venue: venueMatch[1].trim() } : {}),
-          ...(dateMatch ? { date: dateMatch[1].trim() } : {}),
-          ...((!venueMatch && !dateMatch) ? { description: `${collected.description || ''} (Modifications: ${query})` } : {}),
-        };
-        await handleGeneratePlan({ analysis, collected: updatedCollected });
-      } catch (err) {
-        setErrorMessage('Failed to update event plan.');
-      } finally {
-        setLoading(false);
-        setTimeout(() => textareaRef.current?.focus(), 100);
-      }
-      return;
-    }
-
-    // ─── Check for event idea trigger ──────────────────────────────────────
+    // ─── Check for event idea trigger first ──────────────────────────────────
     const { isEventIdea } = detectEventIdea(query);
 
-    if (scheduleWorkflow.step === 'idle' && isEventIdea) {
+    if (isEventIdea) {
       setLoading(true);
       try {
         if (geminiAvailable) {
@@ -558,6 +497,71 @@ export default function AiAssistant() {
       } catch (err) {
         console.error('[Event Idea Error]:', err);
         setErrorMessage('Failed to analyze event idea. Please try again.');
+      } finally {
+        setLoading(false);
+        setTimeout(() => textareaRef.current?.focus(), 100);
+      }
+      return;
+    }
+
+    // ─── WORKFLOW: asking_followup → collect answer ─────────────────────────
+    if (scheduleWorkflow.step === 'asking_followup') {
+      const { pendingQuestion, analysis, collected, missingInfoList = [] } = scheduleWorkflow.data;
+      const field = pendingQuestion?.field;
+      const label = pendingQuestion?.label || field;
+
+      // Store the answer
+      const newCollected = { ...collected, [field]: query, [label]: query };
+
+      // Filter out the answered item
+      const remainingMissing = missingInfoList.filter(
+        (f) => !f.toLowerCase().includes(field.toLowerCase()) && !field.toLowerCase().includes(f.toLowerCase())
+      );
+
+      const nextQ = determineNextQuestion(remainingMissing, newCollected);
+
+      if (nextQ) {
+        // Still more questions to ask
+        setScheduleWorkflow((prev) => ({
+          step: 'asking_followup',
+          data: {
+            ...prev.data,
+            collected: newCollected,
+            pendingQuestion: nextQ,
+            missingInfoList: remainingMissing,
+          },
+        }));
+        addAiMessage(
+          `Got it! **${label}**: *${query}*\n\nNext, **${nextQ.question}**\n*(${nextQ.hint})*`
+        );
+      } else {
+        // All info collected — generate the plan
+        addAiMessage(
+          `Got it! **${label}**: *${query}*\n\nAll necessary information collected. Generating your personalized event plan now...`
+        );
+        await handleGeneratePlan({ ...scheduleWorkflow.data, collected: newCollected, analysis });
+      }
+      setTimeout(() => textareaRef.current?.focus(), 100);
+      return;
+    }
+
+    // ─── WORKFLOW: plan editing ─────────────────────────────────────────────
+    if (scheduleWorkflow.step === 'editing') {
+      setLoading(true);
+      try {
+        const { analysis, collected } = scheduleWorkflow.data;
+        // Parse any update hints from user
+        const venueMatch = query.match(/venue\s+(?:to\s+|is\s+)?([a-z0-9\s,.-]+?)(?:\s+and|\s+date|\s+time|$)/i);
+        const dateMatch = query.match(/date\s+(?:to\s+|is\s+)?([a-z0-9\s,.-]+?)(?:\s+and|\s+venue|\s+time|$)/i);
+        const updatedCollected = {
+          ...collected,
+          ...(venueMatch ? { venue: venueMatch[1].trim() } : {}),
+          ...(dateMatch ? { date: dateMatch[1].trim() } : {}),
+          ...((!venueMatch && !dateMatch) ? { description: `${collected.description || ''} (Modifications: ${query})` } : {}),
+        };
+        await handleGeneratePlan({ analysis, collected: updatedCollected });
+      } catch (err) {
+        setErrorMessage('Failed to update event plan.');
       } finally {
         setLoading(false);
         setTimeout(() => textareaRef.current?.focus(), 100);
@@ -646,18 +650,31 @@ export default function AiAssistant() {
   const handleGeneratePlan = async (workflowData, skipLoadingSet = false) => {
     if (!skipLoadingSet) setLoading(true);
 
-    const { analysis, collected } = workflowData;
+    const { analysis = {}, collected = {} } = workflowData || {};
+    const safeAnalysis = {
+      eventType: analysis?.eventType || 'Event',
+      eventScale: analysis?.eventScale || 'Medium',
+      duration: analysis?.duration || '1 day',
+      targetAudience: analysis?.targetAudience || 'Students',
+      activities: Array.isArray(analysis?.activities) ? analysis.activities : [],
+      operationalAreas: Array.isArray(analysis?.operationalAreas) ? analysis.operationalAreas : ['Operations', 'Logistics'],
+      requirements: Array.isArray(analysis?.requirements) ? analysis.requirements : [],
+      dependencies: Array.isArray(analysis?.dependencies) ? analysis.dependencies : [],
+      risks: Array.isArray(analysis?.risks) ? analysis.risks : [],
+      summary: collected?.description || analysis?.summary || '',
+    };
+
     const details = {
-      name: collected.name || collected['event name'] || `${analysis.eventType} ${new Date().getFullYear()}`,
-      date: collected.date || '',
-      venue: collected.venue || '',
-      participants: collected.participants || '',
-      description: collected.description || '',
+      name: collected?.name || collected?.['event name'] || `${safeAnalysis.eventType} ${new Date().getFullYear()}`,
+      date: collected?.date || '',
+      venue: collected?.venue || '',
+      participants: collected?.participants || analysis?.expectedParticipants || '',
+      description: collected?.description || safeAnalysis.summary || '',
     };
 
     try {
       addAiMessage(
-        `⚙️ **Generating your personalized event plan...**\n\nCreating context-aware tasks for your **${analysis.eventType}**, matching volunteers by skills and calculating deadlines from your event date.`
+        `⚙️ **Generating your personalized event plan...**\n\nCreating context-aware tasks for your **${safeAnalysis.eventType}**, matching volunteers by skills and calculating deadlines from your event date.`
       );
 
       let existingVolunteers = [];
@@ -675,15 +692,19 @@ export default function AiAssistant() {
       let plan;
       try {
         if (geminiAvailable) {
-          plan = await generateEventPlan(analysis, details, existingVolunteers);
+          plan = await generateEventPlan(safeAnalysis, details, existingVolunteers);
         } else {
           plan = generateFallbackPlan({ ...details }, existingVolunteers);
         }
       } catch (geminiErr) {
-        console.warn('[Gemini Plan Generation Error]:', geminiErr.message);
+        console.warn('[Gemini Plan Generation Error]:', geminiErr?.message || geminiErr);
         // Fallback to local plan generator
         plan = generateFallbackPlan({ ...details }, existingVolunteers);
-        addAiMessage(`⚠️ *AI plan generation encountered an issue — falling back to local template planner. The plan below is still tailored to your event description.*`);
+        addAiMessage(`⚠️ *AI plan generation encountered a temporary service issue — generating your tailored blueprint with the local event engine.*`);
+      }
+
+      if (!plan || !Array.isArray(plan.tasks) || plan.tasks.length === 0) {
+        plan = generateFallbackPlan({ ...details }, existingVolunteers);
       }
 
       setScheduleWorkflow({ step: 'plan_ready', data: { ...workflowData, plan } });
@@ -703,7 +724,22 @@ export default function AiAssistant() {
       ]);
     } catch (err) {
       console.error('[Generate Plan Error]:', err);
-      setErrorMessage('Failed to generate event plan. Please try again.');
+      try {
+        const emergencyPlan = generateFallbackPlan(details, []);
+        setScheduleWorkflow({ step: 'plan_ready', data: { ...workflowData, plan: emergencyPlan } });
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `ai-plan-${Date.now()}`,
+            role: 'assistant',
+            content: `✅ **Event Plan Ready: ${emergencyPlan.eventDetails?.name || details.name}**\n\nGenerated operational blueprint for your event. Review below and add to your dashboard.`,
+            eventPlan: emergencyPlan,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        ]);
+      } catch {
+        setErrorMessage('Failed to generate event plan. Please try again.');
+      }
     } finally {
       setLoading(false);
       setTimeout(() => textareaRef.current?.focus(), 100);

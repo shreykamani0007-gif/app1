@@ -212,43 +212,63 @@ export function determineNextQuestion(missingInfo, collected) {
  */
 export async function generateEventPlan(analysis, details, volunteers = []) {
   const today = new Date();
-  const eventDate = details.date
-    ? new Date(details.date)
-    : new Date(today.getTime() + 21 * 24 * 60 * 60 * 1000);
+  let eventDate = new Date(today.getTime() + 21 * 24 * 60 * 60 * 1000);
+  if (details.date) {
+    const parsed = new Date(details.date);
+    if (!isNaN(parsed.getTime())) eventDate = parsed;
+  }
   const eventDateStr = eventDate.toISOString().split('T')[0];
 
-  const volunteersStr = volunteers.length > 0
-    ? volunteers.map(v => `- ID: ${v.id || v._id}, Name: ${v.name}, Role: ${v.role}, Team: ${v.team}`).join('\n')
-    : 'No volunteers currently registered in the system.';
+  const safeAnalysis = {
+    eventType: analysis?.eventType || 'Event',
+    eventScale: analysis?.eventScale || 'Medium',
+    duration: analysis?.duration || '1 day',
+    targetAudience: analysis?.targetAudience || 'Students',
+    activities: Array.isArray(analysis?.activities) ? analysis.activities : [],
+    operationalAreas: Array.isArray(analysis?.operationalAreas) ? analysis.operationalAreas : ['Operations', 'Logistics'],
+    requirements: Array.isArray(analysis?.requirements) ? analysis.requirements : [],
+    dependencies: Array.isArray(analysis?.dependencies) ? analysis.dependencies : [],
+    risks: Array.isArray(analysis?.risks) ? analysis.risks : [],
+    summary: details.description || analysis?.summary || '',
+  };
 
-  const prompt = `You are an expert event operations planner. Generate a COMPLETE, SPECIFIC event plan.
+  const volunteersStr = volunteers.length > 0
+    ? volunteers.map(v => `- ID: "${v.id || v._id}", Name: "${v.name}", Role: "${v.role}", Team/Dept: "${v.team || v.department || 'Operations'}", Shift: "${v.shift || 'Flexible'}"`).join('\n')
+    : 'No volunteers currently registered in the database.';
+
+  const prompt = `You are an expert event operations planner for ClubOps AI. Generate a COMPLETE, HIGHLY CONTEXT-AWARE event plan based strictly on the event analysis and details below.
 
 EVENT ANALYSIS:
-- Event Type: ${analysis.eventType}
-- Scale: ${analysis.eventScale}
-- Duration: ${analysis.duration}
-- Target Audience: ${analysis.targetAudience}
-- Activities: ${analysis.activities.join(', ')}
-- Operational Areas Needed: ${analysis.operationalAreas.join(', ')}
-- Known Risks: ${analysis.risks.join(', ')}
+- Event Type: ${safeAnalysis.eventType}
+- Scale: ${safeAnalysis.eventScale}
+- Duration: ${safeAnalysis.duration}
+- Target Audience: ${safeAnalysis.targetAudience}
+- Expected Participants: ${details.participants || safeAnalysis.expectedParticipants || 'As specified'}
+- Activities: ${safeAnalysis.activities.join(', ') || 'General event activities'}
+- Required Operational Areas: ${safeAnalysis.operationalAreas.join(', ')}
+- Identified Resources & Requirements: ${safeAnalysis.requirements.join(', ') || 'Standard equipment'}
+- Dependencies: ${safeAnalysis.dependencies.join(', ') || 'Standard operational flow'}
+- Potential Risks: ${safeAnalysis.risks.join(', ') || 'Standard operational risks'}
 
 COLLECTED EVENT DETAILS:
-- Event Name: ${details.name || 'Event'}
-- Date: ${eventDateStr}
+- Event Name: ${details.name || safeAnalysis.eventType}
+- Event Date: ${eventDateStr}
 - Venue: ${details.venue || 'To be confirmed'}
-- Expected Participants: ${details.participants || 'Unknown'}
-- User Description: ${details.description || analysis.summary}
+- Expected Participants: ${details.participants || safeAnalysis.expectedParticipants || 'Confirmed'}
+- Additional Description: ${details.description || safeAnalysis.summary}
 
-AVAILABLE VOLUNTEERS IN SYSTEM:
+AVAILABLE VOLUNTEERS IN DATABASE:
 ${volunteersStr}
 
-Generate tasks SPECIFICALLY for a ${analysis.eventType}. 
-${analysis.eventType === 'Hackathon' ? 'Include tasks for: registration platform, contest/judging platform, Wi-Fi/network, mentor management, sponsor booth, prize distribution, participant kits, coding environment setup.' : ''}
-${analysis.eventType === 'Cultural Festival' ? 'Include tasks for: stage setup, sound/lighting, artist/performer management, costume & props, crowd management, security, photography, decoration.' : ''}
-${analysis.eventType === 'Sports Tournament' ? 'Include tasks for: team registration, referee/umpire assignment, field/court preparation, scorekeeping, equipment, medical support, audience safety, trophy/certificate.' : ''}
-${analysis.eventType === 'Workshop' ? 'Include tasks for: speaker confirmation, materials/handouts, projector/AV, hands-on equipment, attendance management, feedback forms, certificates.' : ''}
-${analysis.eventType === 'Seminar' ? 'Include tasks for: speaker logistics, AV setup, seating arrangement, registration desk, live streaming, Q&A moderation, certificates, post-event report.' : ''}
-${analysis.eventType === 'Conference' ? 'Include tasks for: keynote speaker management, track sessions, sponsorship packages, networking areas, badge printing, live streaming, panel management.' : ''}
+==================================================
+TASK GENERATION RULES:
+==================================================
+1. Do NOT generate the same fixed/generic task list. The task list must specifically adapt to a ${safeAnalysis.eventType}.
+${safeAnalysis.eventType.toLowerCase().includes('hackathon') ? '- For this Hackathon: Generate technical tasks (platform, Wi-Fi, contestant accounts), sponsorship tasks (packages, logos, prize pool), logistics (power strips, seating, food), mentor management (schedule, invitations), workshops, registration desk, judging & demos, prize ceremony.' : ''}
+${safeAnalysis.eventType.toLowerCase().includes('cricket') || safeAnalysis.eventType.toLowerCase().includes('sports') || safeAnalysis.eventType.toLowerCase().includes('tournament') ? '- For this Sports Tournament: Generate sports/ground tasks (pitch/court preparation, equipment inspection), team management (fixtures, team check-in), referee/umpire coordination, scorekeeping, medical/first-aid team, audience safety, refreshments, trophy distribution.' : ''}
+${safeAnalysis.eventType.toLowerCase().includes('cultural') || safeAnalysis.eventType.toLowerCase().includes('festival') ? '- For this Cultural Festival: Generate stage setup, sound & lighting, artist/performer schedule, costume & green room, crowd management, photography/videography, security, anchor coordination, awards.' : ''}
+${safeAnalysis.eventType.toLowerCase().includes('workshop') ? '- For this Workshop: Generate speaker confirmation, hands-on lab equipment, projector & AV, attendee software prerequisites, print materials, attendance tracking, feedback forms, certificates.' : ''}
+${safeAnalysis.eventType.toLowerCase().includes('seminar') ? '- For this Seminar: Generate guest speaker travel & hospitality, auditorium AV & mics, presentation review, VIP seating, registration desk, live streaming, Q&A moderation, memento presentation.' : ''}
 DO NOT generate generic tasks that could apply to any event. Tasks must be specific to this event type and activities.
 
 DEADLINE RULES:
