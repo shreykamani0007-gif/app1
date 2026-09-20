@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Calendar,
   Clock,
@@ -14,7 +15,8 @@ import {
   ChevronRight,
   Plus,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Download
 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
@@ -27,11 +29,13 @@ import { useEventContext } from '../context/EventContext';
 import { getEvents, createEvent, getTasksByEvent } from '../services/api';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const {
     events: contextEvents,
     selectedEventId,
     setSelectedEventId,
     refreshEvents: refreshContextEvents,
+    addNewEvent,
   } = useEventContext();
 
   const [events, setEvents] = useState(contextEvents || []);
@@ -94,6 +98,23 @@ export default function Dashboard() {
     }
   }, [selectedEventId, events]);
 
+  const handleExportReport = () => {
+    if (!activeEvent) return;
+    const report = {
+      event: activeEvent,
+      tasks: eventTasks,
+      exportedAt: new Date().toISOString(),
+      stats: { totalTasks: totalTasksCount, completedTasks: completedTasksCount, completionRate: `${completionRate}%` },
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(activeEvent.name || 'event').replace(/\s+/g, '_')}_report.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleCreateEvent = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.date) return;
@@ -102,6 +123,8 @@ export default function Dashboard() {
       setSubmitting(true);
       const res = await createEvent(formData);
       if (res.success && res.data) {
+        // Update EventContext immediately so event switcher reflects the new event
+        addNewEvent(res.data);
         setEvents((prev) => [res.data, ...prev]);
         setSelectedEventIndex(0);
         setIsModalOpen(false);
@@ -132,6 +155,7 @@ export default function Dashboard() {
       };
       const res = await createEvent(sample);
       if (res.success && res.data) {
+        addNewEvent(res.data);
         setEvents((prev) => [res.data, ...prev]);
         setSelectedEventIndex(0);
       }
@@ -325,7 +349,7 @@ export default function Dashboard() {
             >
               Add Event
             </Button>
-            <Button variant="primary" size="sm" icon={ArrowUpRight}>
+            <Button variant="primary" size="sm" icon={Download} onClick={handleExportReport}>
               Export Report
             </Button>
           </div>
@@ -522,7 +546,7 @@ export default function Dashboard() {
                 <CardTitle className="text-sm font-bold text-slate-900">Upcoming Deadlines</CardTitle>
                 <CardDescription>Prioritized operations checkpoints approaching soon</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" className="text-xs">
+              <Button variant="ghost" size="sm" className="text-xs" onClick={() => navigate('/tasks')}>
                 View All Tasks
               </Button>
             </CardHeader>

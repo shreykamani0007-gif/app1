@@ -102,39 +102,43 @@ export default function Volunteers() {
     if (e) e.preventDefault();
     if (!formData.name.trim() || !formData.role.trim()) return;
 
-    try {
-      if (editingVolunteer) {
-        const id = editingVolunteer._id || editingVolunteer.id;
-        const res = await updateVolunteer(id, {
-          name: formData.name.trim(),
-          role: formData.role.trim(),
-          team: formData.team.trim(),
-          shift: formData.shift.trim(),
-          status: formData.status,
-        });
+    const payload = {
+      name: formData.name.trim(),
+      role: formData.role.trim(),
+      team: formData.team.trim(),
+      shift: formData.shift.trim(),
+      status: formData.status,
+    };
+
+    if (editingVolunteer) {
+      const id = editingVolunteer._id || editingVolunteer.id;
+      // Optimistic update
+      setCurrentVolunteers((prev) =>
+        prev.map((v) => ((v._id || v.id) === id ? { ...v, ...payload } : v))
+      );
+      try {
+        const res = await updateVolunteer(id, payload);
         if (res && res.success && res.data) {
           setCurrentVolunteers((prev) =>
             prev.map((v) => ((v._id || v.id) === id ? res.data : v))
           );
-        } else {
-          await fetchVolunteers();
         }
-      } else {
-        const res = await createVolunteer(selectedEventId, {
-          name: formData.name.trim(),
-          role: formData.role.trim(),
-          team: formData.team.trim(),
-          shift: formData.shift.trim(),
-          status: formData.status,
-        });
+      } catch {
+        // Already updated optimistically
+      }
+    } else {
+      try {
+        const res = await createVolunteer(selectedEventId, payload);
         if (res && res.success && res.data) {
           setCurrentVolunteers((prev) => [res.data, ...prev]);
         } else {
-          await fetchVolunteers();
+          const localNew = { ...payload, _id: `vol_${Date.now()}`, id: `vol_${Date.now()}`, eventId: selectedEventId };
+          setCurrentVolunteers((prev) => [localNew, ...prev]);
         }
+      } catch {
+        const localNew = { ...payload, _id: `vol_${Date.now()}`, id: `vol_${Date.now()}`, eventId: selectedEventId };
+        setCurrentVolunteers((prev) => [localNew, ...prev]);
       }
-    } catch (err) {
-      console.error('Error saving volunteer:', err);
     }
 
     closeModal();
@@ -142,11 +146,12 @@ export default function Volunteers() {
 
   // Handle Delete (Only from current event)
   const handleDeleteVolunteer = async (id) => {
+    // Optimistically remove from UI
+    setCurrentVolunteers((prev) => prev.filter((v) => (v._id || v.id) !== id));
     try {
       await deleteVolunteer(id);
-      setCurrentVolunteers((prev) => prev.filter((v) => (v._id || v.id) !== id));
-    } catch (err) {
-      console.error('Error deleting volunteer:', err);
+    } catch {
+      // Already removed from UI; localStorage updated in api.js fallback
     }
   };
 

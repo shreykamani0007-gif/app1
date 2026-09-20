@@ -66,34 +66,38 @@ export default function Documents() {
     if (e) e.preventDefault();
     if (!formData.name.trim()) return;
 
-    try {
-      const res = await createDocument(selectedEventId, {
-        name: formData.name.trim(),
-        title: formData.name.trim(),
-        category: formData.category,
-        size: formData.size.trim() || '1.5 MB',
-        description: formData.description.trim(),
-        uploadedBy: 'Core Team',
-      });
+    const payload = {
+      name: formData.name.trim(),
+      title: formData.name.trim(),
+      category: formData.category,
+      size: formData.size.trim() || '1.5 MB',
+      description: formData.description.trim(),
+      uploadedBy: 'Core Team',
+    };
 
+    try {
+      const res = await createDocument(selectedEventId, payload);
       if (res && res.success && res.data) {
         setDocuments((prev) => [res.data, ...prev]);
       } else {
-        await fetchDocuments();
+        const localNew = { ...payload, _id: `doc_${Date.now()}`, id: `doc_${Date.now()}`, createdAt: new Date().toISOString() };
+        setDocuments((prev) => [localNew, ...prev]);
       }
-    } catch (err) {
-      console.error('Error creating document:', err);
+    } catch {
+      const localNew = { ...payload, _id: `doc_${Date.now()}`, id: `doc_${Date.now()}`, createdAt: new Date().toISOString() };
+      setDocuments((prev) => [localNew, ...prev]);
     }
 
     closeModal();
   };
 
   const handleDeleteDocument = async (id) => {
+    // Optimistically remove from UI first
+    setDocuments((prev) => prev.filter((d) => (d._id || d.id) !== id));
     try {
       await deleteDocument(id);
-      setDocuments((prev) => prev.filter((d) => (d._id || d.id) !== id));
-    } catch (err) {
-      console.error('Error deleting document:', err);
+    } catch {
+      // Already removed from UI; localStorage updated in api.js fallback
     }
   };
 
