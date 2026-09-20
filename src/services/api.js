@@ -1,13 +1,27 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+// On HTTPS deployments (like GitHub Pages), HTTP localhost backend cannot be reached (Mixed Content blocked)
+const isHttpsWithHttpBackend =
+  typeof window !== 'undefined' &&
+  window.location.protocol === 'https:' &&
+  API_BASE_URL.startsWith('http://');
+
 /**
  * Helper to handle fetch responses and errors
  */
 async function request(endpoint, options = {}) {
+  // If running on HTTPS with HTTP backend, fail immediately so offline fallbacks take over without 30s timeout
+  if (isHttpsWithHttpBackend) {
+    throw new Error('Backend server is offline or unreachable on HTTPS deployment.');
+  }
+
   const url = `${API_BASE_URL}${endpoint}`;
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('clubops_auth_token') : null;
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 3500) : null;
 
   const config = {
     headers: {
@@ -15,11 +29,13 @@ async function request(endpoint, options = {}) {
       ...authHeaders,
       ...options.headers,
     },
+    signal: controller ? controller.signal : undefined,
     ...options,
   };
 
   try {
     const res = await fetch(url, config);
+    if (timeoutId) clearTimeout(timeoutId);
     const data = await res.json().catch(() => ({}));
     
     if (!res.ok) {
@@ -28,6 +44,7 @@ async function request(endpoint, options = {}) {
     
     return data;
   } catch (err) {
+    if (timeoutId) clearTimeout(timeoutId);
     console.error(`[API Error] ${options.method || 'GET'} ${endpoint}:`, err.message);
     throw err;
   }
