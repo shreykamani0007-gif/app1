@@ -13,18 +13,25 @@ import { GoogleGenAI } from '@google/genai';
 
 // ─── SDK Initialization ────────────────────────────────────────────────────
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+function getApiKey() {
+  return (
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) ||
+    (typeof process !== 'undefined' && (process.env?.VITE_GEMINI_API_KEY || process.env?.GEMINI_API_KEY)) ||
+    ''
+  );
+}
 
 let _ai = null;
 function getAi() {
   if (!_ai) {
-    if (!GEMINI_API_KEY) throw new Error('Gemini API key not configured. Set VITE_GEMINI_API_KEY in .env');
-    _ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+    const key = getApiKey();
+    if (!key) throw new Error('Gemini API key not configured. Set VITE_GEMINI_API_KEY in .env');
+    _ai = new GoogleGenAI({ apiKey: key });
   }
   return _ai;
 }
 
-const MODEL = 'gemini-2.0-flash';
+const CANDIDATE_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-3.7-flash'];
 
 // ─── JSON Extraction Helper ────────────────────────────────────────────────
 
@@ -37,14 +44,14 @@ function extractJson(text) {
   // Try direct parse first
   try {
     return JSON.parse(text.trim());
-  } catch {}
+  } catch { }
 
   // Strip markdown code fences
   const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenceMatch) {
     try {
       return JSON.parse(fenceMatch[1].trim());
-    } catch {}
+    } catch { }
   }
 
   // Find first { ... } block
@@ -52,28 +59,50 @@ function extractJson(text) {
   if (jsonMatch) {
     try {
       return JSON.parse(jsonMatch[0]);
-    } catch {}
+    } catch { }
   }
 
   throw new Error('Could not extract valid JSON from Gemini response');
 }
 
 /**
- * Call Gemini model with a prompt, return raw text.
+ * Call Gemini model with candidate fallback, return raw text.
  */
 async function callGemini(prompt) {
   const ai = getAi();
-  const response = await ai.models.generateContent({
-    model: MODEL,
-    contents: prompt,
-    config: {
-      temperature: 0.4,
-      maxOutputTokens: 4096,
-    },
-  });
-  const text = response?.candidates?.[0]?.content?.parts?.[0]?.text || response?.text || '';
-  if (!text) throw new Error('Gemini returned an empty response');
-  return text;
+  let lastError = null;
+
+  for (const model of CANDIDATE_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          temperature: 0.2,
+          maxOutputTokens: 8192,
+          responseMimeType: 'application/json',
+        },
+      });
+      const text = response?.candidates?.[0]?.content?.parts?.[0]?.text || response?.text || '';
+      if (text && text.trim()) return text;
+    } catch (err) {
+      console.warn(`[Gemini Model ${model}]:`, err.message);
+      lastError = err;
+      const isRetryable =
+        err.message &&
+        (err.message.includes('404') ||
+          err.message.includes('NOT_FOUND') ||
+          err.message.includes('503') ||
+          err.message.includes('UNAVAILABLE') ||
+          err.message.includes('RESOURCE_EXHAUSTED') ||
+          err.message.includes('quota'));
+      if (isRetryable) continue;
+      // Continue trying other candidates
+      continue;
+    }
+  }
+
+  throw lastError || new Error('Gemini returned an empty response across all models');
 }
 
 // ─── STEP 1: Analyze Event Idea ───────────────────────────────────────────
@@ -289,19 +318,23 @@ Generate at least 12-18 tasks covering all operational areas. Make them realisti
     deadline: t.deadline || eventDateStr,
     dependencies: Array.isArray(t.dependencies) ? t.dependencies : [],
     requiredSkills: Array.isArray(t.requiredSkills) ? t.requiredSkills : [],
-    suggestedRole: t.suggestedRole || '',
+    suggestedRole: t.suggestedVolunteerRole || t.suggestedRole || '',
+    suggestedVolunteerRole: t.suggestedVolunteerRole || t.suggestedRole || '',
     department: t.department || t.category || 'Operations',
     status: 'To Do',
   }));
 
-  const normalizedVolAssignments = (plan.volunteerAssignments || []).map(va => ({
-    taskTitle: va.taskTitle || '',
-    volunteerId: va.volunteerId || null,
-    volunteerName: va.volunteerName || null,
-    matchReason: va.matchReason || '',
-    noMatchReason: va.noMatchReason || '',
-    hasMatch: !!va.volunteerId,
-  }));
+  const normalizedVolAssignments = (plan.volunteerAssignments || []).map(va => {
+    const hasMatch = Boolean(va.hasMatch !== false && va.volunteerId && va.volunteerName);
+    return {
+      taskTitle: va.taskTitle || '',
+      volunteerId: hasMatch ? va.volunteerId : null,
+      volunteerName: hasMatch ? va.volunteerName : null,
+      matchReason: hasMatch ? (va.matchReason || 'Matched by role & skill') : '',
+      noMatchReason: hasMatch ? '' : (va.noMatchReason || 'No suitable volunteer found for this task.'),
+      hasMatch,
+    };
+  });
 
   const normalizedRisks = (plan.risks || []).map(r => ({
     title: r.title || 'Unknown Risk',
@@ -338,5 +371,5 @@ Generate at least 12-18 tasks covering all operational areas. Make them realisti
  * Check if Gemini API is available and configured.
  */
 export function isGeminiConfigured() {
-  return !!GEMINI_API_KEY;
+  return !!getApiKey();
 }

@@ -162,6 +162,35 @@ export default function EventPlanCard({ plan, onAddToDashboard, onEditPlan }) {
             <div className="text-[10px] text-rose-500 font-medium">Risks</div>
           </div>
         </div>
+
+        {/* ── Event Analysis Section (as required by prompt) ── */}
+        {(analysis.eventType || (analysis.activities && analysis.activities.length > 0)) && (
+          <div className="mt-4 p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 text-xs space-y-2.5">
+            <div className="font-bold text-[11px] uppercase tracking-wider text-brand-700 flex items-center gap-1.5">
+              <span>🧠</span> Event Analysis
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700">
+              <div>
+                <span className="font-semibold text-slate-900">Event Type:</span> {analysis.eventType || 'Event'}
+              </div>
+              <div>
+                <span className="font-semibold text-slate-900">Scale:</span> {analysis.eventScale || 'Medium'}
+              </div>
+            </div>
+            {analysis.activities?.length > 0 && (
+              <div>
+                <span className="font-semibold text-slate-900">Activities:</span>{' '}
+                <span className="text-slate-600">{analysis.activities.join(' · ')}</span>
+              </div>
+            )}
+            {analysis.requirements?.length > 0 && (
+              <div>
+                <span className="font-semibold text-slate-900">Key Requirements:</span>{' '}
+                <span className="text-slate-600">{analysis.requirements.join(' · ')}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Schedule ── */}
@@ -376,15 +405,15 @@ export default function EventPlanCard({ plan, onAddToDashboard, onEditPlan }) {
       <div className="pt-4 border-t border-slate-200/80">
         {status === 'pending' && (
           <div className="space-y-3">
-            <p className="text-xs sm:text-sm font-semibold text-slate-800">
-              ✅ Your personalized event plan is ready. Would you like to add it to the dashboard?
+            <p className="text-xs sm:text-sm font-bold text-slate-900">
+              Would you like to add this event plan to the dashboard?
             </p>
             <div className="flex items-center gap-3 flex-wrap">
-              <Button variant="primary" size="sm" icon={Plus} onClick={handleConfirm} className="shadow-sm">
-                Add to Dashboard
+              <Button variant="primary" size="sm" icon={CheckCircle2} onClick={handleConfirm} className="shadow-sm bg-emerald-600 hover:bg-emerald-700">
+                Yes, Add to Dashboard
               </Button>
               <Button variant="outline" size="sm" icon={Edit3} onClick={() => onEditPlan && onEditPlan(plan)}>
-                Modify Plan
+                No, Modify Plan
               </Button>
             </div>
           </div>

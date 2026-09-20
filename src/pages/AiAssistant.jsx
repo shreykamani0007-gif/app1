@@ -419,15 +419,16 @@ export default function AiAssistant() {
 
     // ─── WORKFLOW: asking_followup → collect answer ─────────────────────────
     if (scheduleWorkflow.step === 'asking_followup') {
-      const { pendingQuestion, analysis, collected } = scheduleWorkflow.data;
+      const { pendingQuestion, analysis, collected, missingInfoList = [] } = scheduleWorkflow.data;
       const field = pendingQuestion?.field;
+      const label = pendingQuestion?.label || field;
 
       // Store the answer
-      const newCollected = { ...collected, [field]: query };
+      const newCollected = { ...collected, [field]: query, [label]: query };
 
-      // Determine remaining missing info (update missingInfo list)
-      const remainingMissing = (analysis.missingInfo || []).filter(
-        (f) => !newCollected[f.toLowerCase()] && f.toLowerCase() !== field
+      // Filter out the answered item
+      const remainingMissing = missingInfoList.filter(
+        (f) => !f.toLowerCase().includes(field.toLowerCase()) && !field.toLowerCase().includes(f.toLowerCase())
       );
 
       const nextQ = determineNextQuestion(remainingMissing, newCollected);
@@ -436,14 +437,21 @@ export default function AiAssistant() {
         // Still more questions to ask
         setScheduleWorkflow((prev) => ({
           step: 'asking_followup',
-          data: { ...prev.data, collected: newCollected, pendingQuestion: nextQ },
+          data: {
+            ...prev.data,
+            collected: newCollected,
+            pendingQuestion: nextQ,
+            missingInfoList: remainingMissing,
+          },
         }));
         addAiMessage(
-          `Got it! **${field}**: *${query}*\n\n${nextQ.question}`,
-          {}
+          `Got it! **${label}**: *${query}*\n\nNext, **${nextQ.question}**\n*(${nextQ.hint})*`
         );
       } else {
         // All info collected — generate the plan
+        addAiMessage(
+          `Got it! **${label}**: *${query}*\n\nAll necessary information collected. Generating your personalized event plan now...`
+        );
         await handleGeneratePlan({ ...scheduleWorkflow.data, collected: newCollected, analysis });
       }
       setTimeout(() => textareaRef.current?.focus(), 100);
@@ -483,7 +491,7 @@ export default function AiAssistant() {
         if (geminiAvailable) {
           // GEMINI FLOW: Analyze the event idea
           addAiMessage(
-            `🔍 **Analyzing your event idea...**\n\nLet me understand what you're planning before generating a tailored plan.`,
+            `🔍 **Analyzing your event idea...**\n\nLet me understand what you're planning before generating tasks.`,
             {}
           );
 
@@ -496,17 +504,22 @@ export default function AiAssistant() {
             analysis = {
               eventType: 'Event', eventScale: 'Medium', duration: '1 day',
               targetAudience: 'Students', activities: [], operationalAreas: ['Logistics', 'Operations'],
-              requirements: [], risks: [], missingInfo: ['date', 'venue'],
+              requirements: [], risks: [], missingInfo: ['Event date', 'Venue'],
               summary: query,
             };
           }
 
           // Show analysis card + determine what questions to ask
-          const nextQ = determineNextQuestion(analysis.missingInfo || [], { description: query });
+          const missingInfoList = analysis.missingInfo || [];
+          const nextQ = determineNextQuestion(missingInfoList, { description: query });
 
-          const analysisMessageContent = nextQ
-            ? `✅ **Event Analysis Complete!**\n\nI've analyzed your event idea. Here's what I found:\n\n*See analysis below.* Now let me collect a few more details.\n\n**${nextQ.question}**\n\n*(${nextQ.hint})*`
-            : `✅ **Event Analysis Complete!**\n\nI have everything I need. Generating your personalized event plan now...`;
+          let analysisMessageContent = '';
+          if (nextQ) {
+            const listText = missingInfoList.map((m, idx) => `${idx + 1}. ${m}`).join('\n');
+            analysisMessageContent = `Got it. This looks like a **${analysis.eventType}** for **${analysis.targetAudience || 'students'}**.\n\nTo create an accurate event plan, I need:\n${listText}\n\nLet's start with the **${nextQ.label}**: **${nextQ.question}**\n*(${nextQ.hint})*`;
+          } else {
+            analysisMessageContent = `Got it. This looks like a **${analysis.eventType}** for **${analysis.targetAudience || 'students'}**.\n\nI have all the necessary information. Generating your personalized event plan now...`;
+          }
 
           setMessages((prev) => [
             ...prev,
@@ -527,6 +540,7 @@ export default function AiAssistant() {
                 analysis,
                 collected: { description: query },
                 pendingQuestion: nextQ,
+                missingInfoList,
               },
             });
           } else {
