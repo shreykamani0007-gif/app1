@@ -86,7 +86,7 @@ Features:
 
 Example:
 
-```text
+
 TechFest 2026
 ├── Prepare event posters
 ├── Arrange venue
